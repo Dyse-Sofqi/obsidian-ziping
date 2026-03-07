@@ -1,33 +1,33 @@
 import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
-import {DEFAULT_SETTINGS, MyPluginSettings, SampleSettingTab} from "./settings";
+import {DEFAULT_SETTINGS, ZipingSettings, ZipingSettingTab} from "./settings";
 
-// Remember to rename these classes and interfaces!
+// 记住重命名这些类和接口！
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class ZipingPlugin extends Plugin {
+	settings: ZipingSettings;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
+		// 这在左边栏中创建一个图标。
 		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
+			// 用户单击图标时调用。
 			new Notice('This is a notice!');
 		});
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
+		// 这在应用底部添加状态栏项。在移动应用上不起作用。
 		const statusBarItemEl = this.addStatusBarItem();
 		statusBarItemEl.setText('Status bar text');
 
-		// This adds a simple command that can be triggered anywhere
+		// 这添加一个可以在任何地方触发的简单命令
 		this.addCommand({
 			id: 'open-modal-simple',
 			name: 'Open modal (simple)',
 			callback: () => {
-				new SampleModal(this.app).open();
+				new ZipingModal(this.app).open();
 			}
 		});
-		// This adds an editor command that can perform some operation on the current editor instance
+		// 这添加一个编辑器命令，可以对当前编辑器实例执行某些操作
 		this.addCommand({
 			id: 'replace-selected',
 			name: 'Replace selected content',
@@ -35,46 +35,45 @@ export default class MyPlugin extends Plugin {
 				editor.replaceSelection('Sample editor command');
 			}
 		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
+		// 这添加一个复杂命令，可以检查应用的当前状态是否允许执行该命令
 		this.addCommand({
 			id: 'open-modal-complex',
 			name: 'Open modal (complex)',
 			checkCallback: (checking: boolean) => {
-				// Conditions to check
+				// 要检查的条件
 				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
 				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
+					// 如果检查为真，我们只是在"检查"是否可以运行该命令。
+					// 如果检查为假，那么我们要实际执行操作。
 					if (!checking) {
-						new SampleModal(this.app).open();
+						new ZipingModal(this.app).open();
 					}
 
-					// This command will only show up in Command Palette when the check function returns true
+					// 当检查函数返回真时，此命令才会在命令面板中显示
 					return true;
 				}
 				return false;
 			}
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		// 这添加一个设置标签页，以便用户可以配置插件的各个方面
+		this.addSettingTab(new ZipingSettingTab(this.app, this));
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
+		// 如果插件连接任何全局 DOM 事件（在不属于此插件的应用部分上）
+		// 使用此函数将在禁用此插件时自动删除事件侦听器。
 		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
 			new Notice("Click");
 		});
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
+		// 注册间隔时，此函数将在禁用此插件时自动清除间隔。
 		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-
 	}
 
 	onunload() {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<MyPluginSettings>);
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<ZipingSettings>);
 	}
 
 	async saveSettings() {
@@ -82,7 +81,7 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-class SampleModal extends Modal {
+class ZipingModal extends Modal {
 	constructor(app: App) {
 		super(app);
 	}
