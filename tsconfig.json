@@ -17,6 +17,8 @@
 		"strictBindCallApply": true,
 		"allowSyntheticDefaultImports": true,
 		"useUnknownInCatchVariables": true,
+		"forceConsistentCasingInFileNames": true,
+		"strict": true,
 		"lib": [
 			"DOM",
 			"ES5",

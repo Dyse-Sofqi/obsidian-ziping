@@ -1,8 +1,85 @@
-/*
+/* 八字排盘表格样式 */
+#bazi-result table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    border: 1px solid #ccc !important;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+#bazi-result th,
+#bazi-result td {
+    border: none !important;
+    padding: 8px;
+    text-align: center;
+}
 
-If your plugin does not need CSS, delete this file.
+/* 表头框线 */
+#bazi-result th {
+    background-color: #f5f5f5 !important;
+    font-weight: bold;
+    border-bottom: 1px solid #ccc !important;
+}
 
-*/
+/* 表头第一列加右边框 */
+#bazi-result thead tr th:first-child {
+    border-right: 1px solid #ccc !important;
+}
+
+/* 年柱与大运列之间的框线（第3列和第4列之间，大运是第3列，年柱是第4列） */
+#bazi-result tr td:nth-child(4),
+#bazi-result tr th:nth-child(4) {
+    border-left: 1px solid #ccc !important;
+}
+
+/* 天干和地支行样式 */
+#bazi-result tr td:first-child {
+    font-weight: bold;
+    background-color: #f5f5f5 !important;
+    border-right: 1px solid #ccc !important;
+}
+
+/* 天干行高亮和字体样式（排除第一列栏首） */
+#bazi-result tr:nth-child(3) td:not(:first-child) {
+    background-color: rgba(0, 0, 0, 0.03);
+    font-weight: 600;
+    font-size: 2em;
+    font-family: "汇文正楷", "方正楷体", "华文楷体", "KaiTi", "STKaiti", "楷体", serif;
+    line-height: 1.2;
+}
+
+/* 地支行高亮和字体样式（排除第一列栏首） */
+#bazi-result tr:nth-child(4) td:not(:first-child) {
+    background-color: rgba(0, 0, 0, 0.03);
+    font-weight: 600;
+    font-size: 2em;
+    font-family: "汇文正楷", "方正楷体", "华文楷体", "KaiTi", "STKaiti", "楷体", serif;
+    line-height: 1.2;
+}
+
+/* 五行颜色 - 深色主题（默认）*/
+.c-木 { color: #4caf50 !important; font-weight: 600 !important; }
+.c-火 { color: #f44336 !important; font-weight: 600 !important; }
+.c-土 { color: #d7aefb !important; font-weight: 600 !important; }
+.c-金 { color: #ffb74d !important; font-weight: 600 !important; }
+.c-水 { color: #42a5f5 !important; font-weight: 600 !important; }
+
+/* 五行颜色 - 浅色主题 */
+.theme-light .c-木 { color: #2b8a3e !important; }
+.theme-light .c-火 { color: #c92a2a !important; }
+.theme-light .c-土 { color: #846358 !important; }
+.theme-light .c-金 { color: #f08c00 !important; }
+.theme-light .c-水 { color: #1971c2 !important; }
+
+/* 纳音五行颜色 - 稍淡一些 - 深色主题 */
+#bazi-result tr:nth-child(7) .c-木 { color: #81c784 !important; }
+#bazi-result tr:nth-child(7) .c-火 { color: #e57373 !important; }
+#bazi-result tr:nth-child(7) .c-土 { color: #ba68c8 !important; }
+#bazi-result tr:nth-child(7) .c-金 { color: #ffb74d !important; }
+#bazi-result tr:nth-child(7) .c-水 { color: #64b5f6 !important; }
+
+/* 纳音五行颜色 - 浅色主题 */
+.theme-light #bazi-result tr:nth-child(7) .c-木 { color: #4caf50 !important; }
+.theme-light #bazi-result tr:nth-child(7) .c-火 { color: #ef5350 !important; }
+.theme-light #bazi-result tr:nth-child(7) .c-土 { color: #ab47bc !important; }
+.theme-light #bazi-result tr:nth-child(7) .c-金 { color: #ff9800 !important; }
+.theme-light #bazi-result tr:nth-child(7) .c-水 { color: #2196f3 !important; }

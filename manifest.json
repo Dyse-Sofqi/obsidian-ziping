@@ -1,11 +1,18 @@
 {
 	"id": "obsidian-Ziping",
-	"name": "Ziping",
+	"name": "Paipan Calendar",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
+	"description": "农历公历干支历互转,万年历,四柱,六十甲子,属相,十二星座,二十四节气,八字排盘插件",
+	"author": "hkargc",
+	"authorUrl": "https://github.com/hkargc/paipan",
 	"fundingUrl": "https://obsidian.md/pricing",
-	"isDesktopOnly": false
+	"isDesktopOnly": false,
+	"views": {
+		"paipan-view": {
+			"type": "sidebar",
+			"name": "八字排盘",
+			"icon": "calendar"
+		}
+	}
 }

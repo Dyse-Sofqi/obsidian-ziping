@@ -1,75 +1,61 @@
-import {App, Editor, MarkdownView, Modal, Notice, Plugin} from 'obsidian';
+import {App, Notice, Plugin, WorkspaceLeaf} from 'obsidian';
 import {DEFAULT_SETTINGS, ZipingSettings, ZipingSettingTab} from "./settings";
+import { BaziView, PAIPAN_VIEW_TYPE } from './BaziView';
 
-// 记住重命名这些类和接口！
+// 导入排盘引擎以初始化 window.p
+require('./paipan.js');
 
 export default class ZipingPlugin extends Plugin {
-	settings: ZipingSettings;
+	settings: ZipingSettings = DEFAULT_SETTINGS;
 
 	async onload() {
 		await this.loadSettings();
 
-		// 这在左边栏中创建一个图标。
-		this.addRibbonIcon('dice', 'Sample', (evt: MouseEvent) => {
-			// 用户单击图标时调用。
-			new Notice('This is a notice!');
-		});
+		// 注册侧边栏视图
+		this.registerView(PAIPAN_VIEW_TYPE, (leaf) => new BaziView(leaf, this));
 
-		// 这在应用底部添加状态栏项。在移动应用上不起作用。
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status bar text');
-
-		// 这添加一个可以在任何地方触发的简单命令
+		// 添加打开侧边栏视图的命令
 		this.addCommand({
-			id: 'open-modal-simple',
-			name: 'Open modal (simple)',
+			id: 'open-paipan-view',
+			name: '打开八字排盘',
 			callback: () => {
-				new ZipingModal(this.app).open();
-			}
-		});
-		// 这添加一个编辑器命令，可以对当前编辑器实例执行某些操作
-		this.addCommand({
-			id: 'replace-selected',
-			name: 'Replace selected content',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				editor.replaceSelection('Sample editor command');
-			}
-		});
-		// 这添加一个复杂命令，可以检查应用的当前状态是否允许执行该命令
-		this.addCommand({
-			id: 'open-modal-complex',
-			name: 'Open modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// 要检查的条件
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// 如果检查为真，我们只是在"检查"是否可以运行该命令。
-					// 如果检查为假，那么我们要实际执行操作。
-					if (!checking) {
-						new ZipingModal(this.app).open();
-					}
-
-					// 当检查函数返回真时，此命令才会在命令面板中显示
-					return true;
-				}
-				return false;
+				this.activateView();
 			}
 		});
 
-		// 这添加一个设置标签页，以便用户可以配置插件的各个方面
+		// 添加设置标签页
 		this.addSettingTab(new ZipingSettingTab(this.app, this));
 
-		// 如果插件连接任何全局 DOM 事件（在不属于此插件的应用部分上）
-		// 使用此函数将在禁用此插件时自动删除事件侦听器。
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			new Notice("Click");
-		});
-
-		// 注册间隔时，此函数将在禁用此插件时自动清除间隔。
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		// 如果不存在八字排盘视图，则在右侧侧边栏打开它
+		if (this.app.workspace.getLeavesOfType(PAIPAN_VIEW_TYPE).length === 0) {
+			await this.activateView();
+		}
 	}
 
 	onunload() {
+	}
+
+	async activateView() {
+		const { workspace } = this.app;
+
+		// 检查是否已有八字排盘视图的 leaf
+		const leaves = workspace.getLeavesOfType(PAIPAN_VIEW_TYPE);
+		if (leaves.length > 0) {
+			const leaf = leaves[0];
+			if (leaf) {
+				workspace.revealLeaf(leaf);
+				// 刷新数据
+				const view = leaf.view as BaziView;
+				if (view && view.loadCurrentTime) {
+					view.loadCurrentTime();
+				}
+			}
+			return;
+		}
+
+		// 在右侧侧边栏创建新 leaf
+		const leaf = workspace.getLeaf(false);
+		await leaf.setViewState({ type: PAIPAN_VIEW_TYPE, active: true });
 	}
 
 	async loadSettings() {
@@ -79,20 +65,45 @@ export default class ZipingPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
-}
 
-class ZipingModal extends Modal {
-	constructor(app: App) {
-		super(app);
+	async saveBaziToFile(title: string, data: any) {
+		const basePath = this.settings.casePath || '命例';
+		const fileName = `${title || '命例'}.md`;
+		const filePath = `${basePath}/${fileName}`;
+
+		try {
+			// 检查并创建文件夹
+			const folder = this.app.vault.getAbstractFileByPath(basePath);
+			if (!folder) {
+				await this.app.vault.createFolder(basePath);
+				new Notice(`已创建文件夹: ${basePath}`);
+			}
+
+			// 构建 Markdown 内容
+			const content = this.formatBaziToMarkdown(title, data);
+
+			// 保存文件
+			await this.app.vault.create(filePath, content);
+			new Notice(`已保存到 ${filePath}`);
+		} catch (error) {
+			new Notice('保存失败: ' + (error as Error).message);
+		}
 	}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
+	private formatBaziToMarkdown(title: string, data: any): string {
+		const lines: string[] = [];
+		lines.push(`# ${title || '命例'}`);
+		lines.push('');
+		lines.push(`## 基本信息`);
+		lines.push(`- 出生时间: ${data.year}年${data.month}月${data.day}日 ${data.hour}:${data.minute}:${data.second}`);
+		lines.push(`- 性别: ${data.gender === 1 ? '男' : '女'}`);
+		lines.push('');
+		lines.push('');
+		if (data.solarTerms) {
+			lines.push(`## 节气`);
+			lines.push(`- 前节气: ${data.solarTerms.prev || ''}`);
+			lines.push(`- 后节气: ${data.solarTerms.next || ''}`);
+		}
+		return lines.join('\n');
 	}
 }
