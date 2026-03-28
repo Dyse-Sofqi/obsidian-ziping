@@ -57,6 +57,7 @@ export interface NearbySolarTerms {
 
 export interface DayunItem {
     age: number;
+    startYear: number;  // 换运年份
     gan: string;
     zhi: string;
     gz: string;
@@ -109,13 +110,14 @@ export class Paipan {
         }
 
         // 获取真太阳时（如果有设置经纬度）
+        // result.zty 已经是转换好的时间数组 [Y, M, D, h, mi, s]
         let zty: { hour: number; minute: number; second: number } | undefined;
-        if (result.zty !== undefined) {
-            const ztyDate = this.jdToDate(result.zty);
+        if (result.zty !== undefined && Array.isArray(result.zty)) {
+            // result.zty 是 [Y, M, D, h, mi, s] 格式，直接取小时、分钟、秒
             zty = {
-                hour: ztyDate.getHours(),
-                minute: ztyDate.getMinutes(),
-                second: ztyDate.getSeconds()
+                hour: result.zty[3] as number,
+                minute: result.zty[4] as number,
+                second: result.zty[5] as number
             };
         }
 
@@ -173,6 +175,7 @@ export class Paipan {
 
         const allDayun: DayunItem[] = rt.dy.slice(0, 9).map(item => ({
             age: item.zqage,
+            startYear: birthYear + item.zqage,  // 换运年份 = 出生年份 + 起始岁数
             gan: item.zfma,
             zhi: item.zfmb,
             gz: `${item.zfma}${item.zfmb}`
@@ -186,7 +189,13 @@ export class Paipan {
             const item = rt.dy[i];
             if (item && typeof item.zqage === 'number' && typeof item.zboz === 'number') {
                 if (age >= item.zqage && age <= item.zboz) {
-                    currentDayun = { age: item.zqage, gan: item.zfma, zhi: item.zfmb, gz: `${item.zfma}${item.zfmb}` };
+                    currentDayun = {
+                        age: item.zqage,
+                        startYear: birthYear + item.zqage,
+                        gan: item.zfma,
+                        zhi: item.zfmb,
+                        gz: `${item.zfma}${item.zfmb}`
+                    };
                     break;
                 }
             }
@@ -239,11 +248,40 @@ export class Paipan {
         // 这里简化计算，实际应该考虑正月初一
         const ganIndex = (year - 4) % 10; // 甲子年是4年
         const zhiIndex = (year - 4) % 12;
-        
+
         const gan = this.engine.ctg[ganIndex < 0 ? ganIndex + 10 : ganIndex];
         const zhi = this.engine.cdz[zhiIndex < 0 ? zhiIndex + 12 : zhiIndex];
-        
+
         return { gan: gan || '甲', zhi: zhi || '子' };
+    }
+
+    // 计算小运 - 男顺女逆
+    // 根据出生年份的干支，男命每年顺推，女命每年逆推
+    getXiaoYun(birthYear: number, gender: number, age: number): { gan: string; zhi: string; year: number; age: number } {
+        // 出生年的年干支索引
+        const birthGanIndex = (birthYear - 4) % 10;
+        const birthZhiIndex = (birthYear - 4) % 12;
+
+        // 男顺推，女逆推
+        const direction = (gender === 0) ? 1 : -1; // 0=男，1=女
+
+        // 计算age岁时的年干支
+        const offset = direction * age;
+        const ganIndex = (birthGanIndex + offset) % 10;
+        const zhiIndex = (birthZhiIndex + offset) % 12;
+
+        const adjustedGanIndex = ganIndex < 0 ? ganIndex + 10 : ganIndex;
+        const adjustedZhiIndex = zhiIndex < 0 ? zhiIndex + 12 : zhiIndex;
+
+        const gan = this.engine.ctg[adjustedGanIndex] || '甲';
+        const zhi = this.engine.cdz[adjustedZhiIndex] || '子';
+
+        return {
+            gan,
+            zhi,
+            year: birthYear + offset,
+            age: age
+        };
     }
 
     // 计算十神关系 - 使用paipan.js中的dgs查找表
@@ -277,6 +315,35 @@ export class Paipan {
         return sss[shiShenIndex] || '';
     }
 
+    // 获取十神全称
+    getShiShenFull(dayGan: string, otherGan: string): string {
+        const dayIndex = this.engine.ctg.indexOf(dayGan);
+        const otherIndex = this.engine.ctg.indexOf(otherGan);
+
+        if (dayIndex === -1 || otherIndex === -1) return '';
+
+        const dgs: number[][] = [
+            [2, 3, 1, 0, 9, 8, 7, 6, 5, 4],  // 甲
+            [3, 2, 0, 1, 8, 9, 6, 7, 4, 5],  // 乙
+            [5, 4, 2, 3, 1, 0, 9, 8, 7, 6],  // 丙
+            [4, 5, 3, 2, 0, 1, 8, 9, 6, 7],  // 丁
+            [7, 6, 5, 4, 2, 3, 1, 0, 9, 8],  // 戊
+            [6, 7, 4, 5, 3, 2, 0, 1, 8, 9],  // 己
+            [9, 8, 7, 6, 5, 4, 2, 3, 1, 0],  // 庚
+            [8, 9, 6, 7, 4, 5, 3, 2, 0, 1],  // 辛
+            [1, 0, 9, 8, 7, 6, 5, 4, 2, 3],  // 壬
+            [0, 1, 8, 9, 6, 7, 4, 5, 3, 2]   // 癸
+        ];
+
+        const sssFull = ['伤官', '食神', '比肩', '劫财', '正印', '偏印', '正官', '偏官', '正财', '偏财'];
+
+        const dayRow = dgs[dayIndex];
+        if (!dayRow) return '';
+        const shiShenIndex = dayRow[otherIndex];
+        if (shiShenIndex === undefined) return '';
+        return sssFull[shiShenIndex] || '';
+    }
+
     // 地支藏气
     getCangQi(zhi: string): { main: string; middle: string; residual: string } {
         const map: Record<string, [string, string, string]> = {
@@ -286,6 +353,59 @@ export class Paipan {
         };
         const v = map[zhi] || ['', '', ''];
         return { main: v[0] || '', middle: v[1] || '', residual: v[2] || '' };
+    }
+
+    // 计算地支十神 - 根据地支的主气（藏干第一个）计算与日干的十神关系
+    getZhiShiShen(dayGan: string, zhi: string): string {
+        // 地支藏干表（索引0-11对应子到亥）
+        const zcg: number[][] = [
+            [9, -1, -1],  // 子 - 癸
+            [5, 9, 7],    // 丑 - 己辛癸
+            [0, 2, 4],    // 寅 - 甲丙戊
+            [1, -1, -1],  // 卯 - 乙
+            [4, 1, 9],    // 辰 - 戊乙癸
+            [2, 4, 6],    // 巳 - 丙庚戊
+            [3, 5, -1],   // 午 - 丁己
+            [5, 1, 3],    // 未 - 己丁乙
+            [6, 8, 4],    // 申 - 庚壬戊
+            [7, -1, -1],  // 酉 - 辛
+            [4, 7, 3],    // 戌 - 戊辛丁
+            [8, 0, -1]    // 亥 - 壬甲
+        ];
+
+        const dzIndex = this.engine.cdz.indexOf(zhi);
+        if (dzIndex === -1) return '';
+
+        // 获取地支的主气（第一个藏干）
+        const zhiCangGan = zcg[dzIndex];
+        if (!zhiCangGan || zhiCangGan[0] === undefined || zhiCangGan[0] === -1) return '';
+        const mainCangGanIndex: number = zhiCangGan[0];
+        if (isNaN(mainCangGanIndex)) return '';
+
+        // 使用dgs表计算十神
+        const dayIndex = this.engine.ctg.indexOf(dayGan);
+        if (dayIndex === -1) return '';
+
+        const dgs: number[][] = [
+            [2, 3, 1, 0, 9, 8, 7, 6, 5, 4],  // 甲
+            [3, 2, 0, 1, 8, 9, 6, 7, 4, 5],  // 乙
+            [5, 4, 2, 3, 1, 0, 9, 8, 7, 6],  // 丙
+            [4, 5, 3, 2, 0, 1, 8, 9, 6, 7],  // 丁
+            [7, 6, 5, 4, 2, 3, 1, 0, 9, 8],  // 戊
+            [6, 7, 4, 5, 3, 2, 0, 1, 8, 9],  // 己
+            [9, 8, 7, 6, 5, 4, 2, 3, 1, 0],  // 庚
+            [8, 9, 6, 7, 4, 5, 3, 2, 0, 1],  // 辛
+            [1, 0, 9, 8, 7, 6, 5, 4, 2, 3],  // 壬
+            [0, 1, 8, 9, 6, 7, 4, 5, 3, 2]   // 癸
+        ];
+
+        const sss = ['伤', '食', '比', '劫', '印', '枭', '官', '杀', '财', '才'];
+
+        const dayRow = dgs[dayIndex];
+        if (!dayRow) return '';
+        const shiShenIndex = dayRow[mainCangGanIndex];
+        if (shiShenIndex === undefined) return '';
+        return sss[shiShenIndex] || '';
     }
 
     // 纳音
@@ -305,12 +425,41 @@ export class Paipan {
         return map[gz] || '';
     }
 
-    getXingYun(dayGan: string, zhi: string): string {
-        return `${dayGan}${zhi}`; // 简化：原始星运需要规则，这里先以组合展示
+    // 计算十二长生状态 - 参考paipan.js中的szs数组和计算公式
+    // szs: 日干对地支为"子"者所对应的运程代码 [甲,乙,丙,丁,戊,己,庚,辛,壬,癸]
+    // 十二长生顺序: 长生, 沐浴, 冠带, 临官, 帝旺, 衰, 病, 死, 墓, 绝, 胎, 养
+    getZhangSheng(dayGan: string, zhi: string): string {
+        const ctg = this.engine.ctg; // 十天干
+        const cdz = this.engine.cdz; // 十二地支
+        const czs = ["长生", "沐浴", "冠带", "临官", "帝旺", "衰", "病", "死", "墓", "绝", "胎", "养"];
+
+        const dayIndex = ctg.indexOf(dayGan);
+        const zhiIndex = cdz.indexOf(zhi);
+
+        if (dayIndex === -1 || zhiIndex === -1) return '';
+
+        // szs数组：日干对地支为"子"者所对应的运程代码
+        const szs = [1, 6, 10, 9, 10, 9, 7, 0, 4, 3];
+        const szsValue = szs[dayIndex];
+        if (szsValue === undefined) return '';
+
+        // 计算公式: (24 + szs[日干索引] + (-1)^日干索引 * 地支索引) % 12
+        // 阳干用加法，阴干用减法
+        const isYang = dayIndex % 2 === 0; // 0,2,4,6,8 为阳干
+        const offset = isYang ? zhiIndex : -zhiIndex;
+        const zhangShengIndex = (24 + szsValue + offset) % 12;
+
+        return czs[zhangShengIndex] || '';
     }
 
+    // 星运：日柱天干对应各柱地支的十二长生状态
+    getXingYun(dayGan: string, zhi: string): string {
+        return this.getZhangSheng(dayGan, zhi);
+    }
+
+    // 自坐：各柱天干对应本柱地支的十二长生状态
     getZiZuo(gan: string, zhi: string): string {
-        return `${gan}${zhi}`; // 简化：暂展示本气组合
+        return this.getZhangSheng(gan, zhi);
     }
 
     getXunKong(gz: string): string {

@@ -1,5 +1,6 @@
 import {App, PluginSettingTab, Setting} from "obsidian";
 import ZipingPlugin from "./main";
+import cityData from "./city.json";
 
 // 城市经纬度数据
 export interface CityData {
@@ -8,58 +9,148 @@ export interface CityData {
 	latitude: number;
 }
 
-export const CITIES: CityData[] = [
-	{ name: '北京', longitude: 116.46, latitude: 39.92 },
-	{ name: '上海', longitude: 121.48, latitude: 31.22 },
-	{ name: '天津', longitude: 117.2, latitude: 39.12 },
-	{ name: '重庆', longitude: 106.54, latitude: 29.59 },
-	{ name: '哈尔滨', longitude: 126.63, latitude: 45.75 },
-	{ name: '长春', longitude: 125.35, latitude: 43.88 },
-	{ name: '沈阳', longitude: 123.38, latitude: 41.8 },
-	{ name: '石家庄', longitude: 114.48, latitude: 38.03 },
-	{ name: '太原', longitude: 112.53, latitude: 37.87 },
-	{ name: '呼和浩特', longitude: 111.65, latitude: 40.82 },
-	{ name: '南京', longitude: 118.78, latitude: 32.04 },
-	{ name: '杭州', longitude: 120.19, latitude: 30.26 },
-	{ name: '合肥', longitude: 117.27, latitude: 31.86 },
-	{ name: '福州', longitude: 119.3, latitude: 26.08 },
-	{ name: '南昌', longitude: 115.89, latitude: 28.68 },
-	{ name: '济南', longitude: 117.0, latitude: 36.65 },
-	{ name: '郑州', longitude: 113.62, latitude: 34.76 },
-	{ name: '武汉', longitude: 114.31, latitude: 30.52 },
-	{ name: '长沙', longitude: 113.0, latitude: 28.21 },
-	{ name: '广州', longitude: 113.23, latitude: 23.16 },
-	{ name: '南宁', longitude: 108.33, latitude: 22.84 },
-	{ name: '成都', longitude: 104.06, latitude: 30.67 },
-	{ name: '贵阳', longitude: 106.71, latitude: 26.57 },
-	{ name: '昆明', longitude: 102.73, latitude: 25.04 },
-	{ name: '拉萨', longitude: 91.11, latitude: 29.65 },
-	{ name: '西安', longitude: 108.95, latitude: 34.27 },
-	{ name: '兰州', longitude: 103.73, latitude: 36.03 },
-	{ name: '西宁', longitude: 101.74, latitude: 36.56 },
-	{ name: '银川', longitude: 106.27, latitude: 38.47 },
-	{ name: '乌鲁木齐', longitude: 87.68, latitude: 43.77 },
-	{ name: '香港', longitude: 114.17, latitude: 22.28 },
-	{ name: '澳门', longitude: 113.55, latitude: 22.2 },
-	{ name: '台北', longitude: 121.5, latitude: 25.05 },
-	{ name: '海口', longitude: 110.35, latitude: 20.02 },
-	{ name: '三亚', longitude: 109.31, latitude: 18.25 },
-	{ name: '深圳', longitude: 114.07, latitude: 22.62 },
-	{ name: '宁波', longitude: 121.56, latitude: 29.86 },
-	{ name: '青岛', longitude: 120.38, latitude: 36.07 },
-	{ name: '大连', longitude: 121.62, latitude: 38.92 },
-	{ name: '厦门', longitude: 118.1, latitude: 24.46 },
-	{ name: '苏州', longitude: 120.58, latitude: 31.3 },
-	{ name: '无锡', longitude: 120.29, latitude: 31.49 },
-	{ name: '佛山', longitude: 113.12, latitude: 23.02 },
-	{ name: '东莞', longitude: 113.75, latitude: 23.04 },
-	{ name: '温州', longitude: 120.67, latitude: 28.0 },
-	{ name: '绍兴', longitude: 120.58, latitude: 30.0 },
-	{ name: '嘉兴', longitude: 120.76, latitude: 30.74 },
-	{ name: '金华', longitude: 119.64, latitude: 29.08 },
-	{ name: '徐州', longitude: 117.18, latitude: 34.26 },
-	{ name: '扬州', longitude: 119.43, latitude: 32.39 }
-];
+// city.json 的数据类型
+interface CityJsonItem {
+	id: number;
+	pid: number;
+	name: string;
+	j: number;
+	w: number;
+}
+
+// 省份数据类型
+export interface ProvinceData {
+	name: string;
+	id: number;
+}
+
+// 省份-城市分组
+export interface ProvinceCityGroup {
+	province: ProvinceData;
+	cities: CityData[];
+}
+
+// 从 city.json 加载并筛选城市数据
+function loadCities(): CityData[] {
+	const cities: CityData[] = [];
+
+	// 1. 添加直辖市 (pid=0 且 name 以"市"结尾)
+	const municipalities = cityData.filter(
+		(c: CityJsonItem) => c.pid === 0 && c.name.endsWith("市")
+	);
+	municipalities.forEach((c: CityJsonItem) => {
+		cities.push({
+			name: c.name.replace("市", ""),
+			longitude: c.j,
+			latitude: c.w
+		});
+	});
+
+	// 2. 添加香港、澳门 (特殊行政区)
+	const specialRegions = cityData.filter(
+		(c: CityJsonItem) => c.name.includes("香港") || c.name.includes("澳门")
+	);
+	specialRegions.forEach((c: CityJsonItem) => {
+		cities.push({
+			name: c.name.replace("特别行政区", "").replace("澳门", "澳门").replace("香港", "香港"),
+			longitude: c.j,
+			latitude: c.w
+		});
+	});
+
+	// 3. 添加地级市 (pid > 0 且 name 以"市"结尾)
+	const prefectureCities = cityData.filter(
+		(c: CityJsonItem) => c.pid > 0 && c.name.endsWith("市")
+	);
+	prefectureCities.forEach((c: CityJsonItem) => {
+		cities.push({
+			name: c.name.replace("市", ""),
+			longitude: c.j,
+			latitude: c.w
+		});
+	});
+
+	// 4. 按名称去重
+	const seen = new Set<string>();
+	const uniqueCities: CityData[] = [];
+	for (const city of cities) {
+		if (!seen.has(city.name)) {
+			seen.add(city.name);
+			uniqueCities.push(city);
+		}
+	}
+
+	// 5. 按名称排序
+	uniqueCities.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+
+	return uniqueCities;
+}
+
+// 加载省份分组数据（用于两级联动选择器）
+function loadProvinceCityGroups(): ProvinceCityGroup[] {
+	const groups: ProvinceCityGroup[] = [];
+
+	// 1. 获取所有省份 (pid=0 且不是直辖市)
+	const provinces = cityData.filter(
+		(c: CityJsonItem) => c.pid === 0 && !c.name.endsWith("市")
+	);
+
+	// 2. 为每个省份添加其地级市
+	provinces.forEach((province: CityJsonItem) => {
+		const citiesInProvince = cityData.filter(
+			(c: CityJsonItem) => c.pid === province.id && c.name.endsWith("市")
+		);
+
+		const cities: CityData[] = citiesInProvince.map((c: CityJsonItem) => ({
+			name: c.name.replace("市", ""),
+			longitude: c.j,
+			latitude: c.w
+		}));
+
+		// 按名称排序
+		cities.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+
+		groups.push({
+			province: { name: province.name, id: province.id },
+			cities
+		});
+	});
+
+	// 3. 添加直辖市作为单独的组
+	const municipalities = cityData.filter(
+		(c: CityJsonItem) => c.pid === 0 && c.name.endsWith("市")
+	);
+	municipalities.forEach((c: CityJsonItem) => {
+		groups.unshift({
+			province: { name: c.name.replace("市", ""), id: c.id },
+			cities: [{
+				name: c.name.replace("市", ""),
+				longitude: c.j,
+				latitude: c.w
+			}]
+		});
+	});
+
+	// 4. 添加香港、澳门
+	const specialRegions = cityData.filter(
+		(c: CityJsonItem) => c.name.includes("香港") || c.name.includes("澳门")
+	);
+	specialRegions.forEach((c: CityJsonItem) => {
+		groups.push({
+			province: { name: c.name.replace("特别行政区", ""), id: c.id },
+			cities: [{
+				name: c.name.replace("特别行政区", ""),
+				longitude: c.j,
+				latitude: c.w
+			}]
+		});
+	});
+
+	return groups;
+}
+
+export const CITIES: CityData[] = loadCities();
+export const PROVINCE_CITY_GROUPS: ProvinceCityGroup[] = loadProvinceCityGroups();
 
 export interface ZipingSettings {
 	mySetting: string;
