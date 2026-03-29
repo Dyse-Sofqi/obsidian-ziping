@@ -235,6 +235,53 @@ export class Paipan {
         }
     }
 
+    // 农历转公历
+    lunarToSolar(yy: number, mm: number, dd: number, isLeap: boolean): { year: number; month: number; day: number } | null {
+        try {
+            // 调用paipan.js中的Lunar2Solar方法
+            const result = (this.engine as any).Lunar2Solar(yy, mm, dd, isLeap);
+            if (!result || !Array.isArray(result) || result.length < 3) {
+                return null;
+            }
+
+            const [year, month, day] = result;
+            return {
+                year,
+                month,
+                day
+            };
+        } catch (error) {
+            console.error('农历转公历失败:', error);
+            return null;
+        }
+    }
+
+    // 获取指定年份的闰月信息
+    getLeapMonth(year: number): number {
+        try {
+            // 调用paipan.js中的GetZQandSMandLunarMonthCode方法获取月份代码
+            const [mc] = (this.engine as any).GetZQandSMandLunarMonthCode(year);
+            if (!mc || !Array.isArray(mc)) {
+                return 0;
+            }
+
+            // 查找闰月
+            for (let i = 1; i <= 14; i++) {
+                if (mc[i] && mc[i] - Math.floor(mc[i]) > 0) {
+                    // 找到闰月，返回月份号（减2是因为mc从0开始，0对应农历11月，1对应农历12月，2对应正月）
+                    const leapMonth = Math.floor(mc[i] + 0.5) - 2;
+                    if (leapMonth >= 1 && leapMonth <= 12) {
+                        return leapMonth;
+                    }
+                }
+            }
+            return 0;
+        } catch (error) {
+            console.error('获取闰月信息失败:', error);
+            return 0;
+        }
+    }
+
     getLunarDayName(day: number): string {
         if (day >= 1 && day <= 30 && this.engine.dxd && this.engine.dxd[day - 1]) {
             return this.engine.dxd[day - 1]!;
@@ -463,18 +510,39 @@ export class Paipan {
     }
 
     getXunKong(gz: string): string {
-        const map: Record<string, string> = {
-            甲子: '戌亥', 乙丑: '戌亥', 丙寅: '申酉', 丁卯: '申酉', 戊辰: '午未', 己巳: '午未',
-            庚午: '辰巳', 辛未: '辰巳', 壬申: '寅卯', 癸酉: '寅卯', 甲戌: '子丑', 乙亥: '子丑',
-            丙子: '戌亥', 丁丑: '戌亥', 戊寅: '申酉', 己卯: '申酉', 庚辰: '午未', 辛巳: '午未',
-            壬午: '辰巳', 癸未: '辰巳', 甲申: '寅卯', 乙酉: '寅卯', 丙戌: '子丑', 丁亥: '子丑',
-            戊子: '戌亥', 己丑: '戌亥', 庚寅: '申酉', 辛卯: '申酉', 壬辰: '午未', 癸巳: '午未',
-            甲午: '辰巳', 乙未: '辰巳', 丙申: '寅卯', 丁酉: '寅卯', 戊戌: '子丑', 己亥: '子丑',
-            庚子: '戌亥', 辛丑: '戌亥', 壬寅: '申酉', 癸卯: '申酉', 甲辰: '午未', 乙巳: '午未',
-            丙午: '辰巳', 丁未: '辰巳', 戊申: '寅卯', 己酉: '寅卯', 庚戌: '子丑', 辛亥: '子丑',
-            壬子: '戌亥', 癸丑: '戌亥'
+        if (!gz || gz.length < 2) return '';
+
+        // 六十甲子
+        const gzArray = [
+            '甲子', '乙丑', '丙寅', '丁卯', '戊辰', '己巳', '庚午', '辛未', '壬申', '癸酉',
+            '甲戌', '乙亥', '丙子', '丁丑', '戊寅', '己卯', '庚辰', '辛巳', '壬午', '癸未',
+            '甲申', '乙酉', '丙戌', '丁亥', '戊子', '己丑', '庚寅', '辛卯', '壬辰', '癸巳',
+            '甲午', '乙未', '丙申', '丁酉', '戊戌', '己亥', '庚子', '辛丑', '壬寅', '癸卯',
+            '甲辰', '乙巳', '丙午', '丁未', '戊申', '己酉', '庚戌', '辛亥', '壬子', '癸丑',
+            '甲寅', '乙卯', '丙辰', '丁巳', '戊午', '己未', '庚申', '辛酉', '壬戌', '癸亥'
+        ];
+
+        // 查找干支在六十甲子中的序数
+        const index = gzArray.indexOf(gz);
+        if (index === -1) return '';
+
+        // 根据序数判断该柱属于哪一旬，返回对应的空亡地支
+        // 序数 0-9：甲子旬（甲子到癸酉）：空戌亥
+        // 序数 10-19：甲戌旬（甲戌到癸未）：空申酉
+        // 序数 20-29：甲申旬（甲申到癸巳）：空午未
+        // 序数 30-39：甲午旬（甲午到癸卯）：空辰巳
+        // 序数 40-49：甲辰旬（甲辰到癸丑）：空寅卯
+        // 序数 50-59：甲寅旬（甲寅到癸亥）：空子丑
+        const xunKongMap: Record<number, string> = {
+            0: '戌亥', 1: '戌亥', 2: '戌亥', 3: '戌亥', 4: '戌亥', 5: '戌亥', 6: '戌亥', 7: '戌亥', 8: '戌亥', 9: '戌亥',
+            10: '申酉', 11: '申酉', 12: '申酉', 13: '申酉', 14: '申酉', 15: '申酉', 16: '申酉', 17: '申酉', 18: '申酉', 19: '申酉',
+            20: '午未', 21: '午未', 22: '午未', 23: '午未', 24: '午未', 25: '午未', 26: '午未', 27: '午未', 28: '午未', 29: '午未',
+            30: '辰巳', 31: '辰巳', 32: '辰巳', 33: '辰巳', 34: '辰巳', 35: '辰巳', 36: '辰巳', 37: '辰巳', 38: '辰巳', 39: '辰巳',
+            40: '寅卯', 41: '寅卯', 42: '寅卯', 43: '寅卯', 44: '寅卯', 45: '寅卯', 46: '寅卯', 47: '寅卯', 48: '寅卯', 49: '寅卯',
+            50: '子丑', 51: '子丑', 52: '子丑', 53: '子丑', 54: '子丑', 55: '子丑', 56: '子丑', 57: '子丑', 58: '子丑', 59: '子丑'
         };
-        return map[gz] || '';
+
+        return xunKongMap[index] || '';
     }
 
     // 获取天干的五行属性

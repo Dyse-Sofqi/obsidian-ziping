@@ -11,6 +11,7 @@ interface CurrentBaziData {
 	minute: number;
 	second: number;
 	gender: number;
+	name: string;
 	bazi: BaziResult;
 	solarTerms: NearbySolarTerms;
 	dayun: CurrentDayunData;
@@ -67,67 +68,6 @@ export class BaziView extends ItemView {
 		// 结果显示区域
 		this.createResultArea(container);
 
-		// 时间调整按钮
-		const timeAdjustContainer = container.createEl('div');
-		timeAdjustContainer.addClass('time-adjust-container');
-
-		// 第一排按钮（往前减）
-		const row1 = timeAdjustContainer.createEl('div');
-		row1.addClass('time-adjust-row');
-		const yearMinusBtn = row1.createEl('button', { text: '年↑' });
-		const monthMinusBtn = row1.createEl('button', { text: '月↑' });
-		const dayMinusBtn = row1.createEl('button', { text: '日↑' });
-		const hourMinusBtn = row1.createEl('button', { text: '时↑' });
-
-		// 第二排按钮（往后加）
-		const row2 = timeAdjustContainer.createEl('div');
-		row2.addClass('time-adjust-row');
-		const yearPlusBtn = row2.createEl('button', { text: '年↓' });
-		const monthPlusBtn = row2.createEl('button', { text: '月↓' });
-		const dayPlusBtn = row2.createEl('button', { text: '日↓' });
-		const hourPlusBtn = row2.createEl('button', { text: '时↓' });
-
-		// 时间调整函数
-		const adjustTime = (yearDelta: number, monthDelta: number, dayDelta: number, hourDelta: number) => {
-			if (!this.currentData) {
-				new Notice('请先设置时间');
-				return;
-			}
-			// 使用Date对象处理日期进位/退位
-			const date = new Date(
-				this.currentData.year,
-				this.currentData.month - 1,
-				this.currentData.day,
-				this.currentData.hour,
-				this.currentData.minute,
-				this.currentData.second
-			);
-			date.setFullYear(date.getFullYear() + yearDelta);
-			date.setMonth(date.getMonth() + monthDelta);
-			date.setDate(date.getDate() + dayDelta);
-			date.setHours(date.getHours() + hourDelta);
-
-			this.calculateAndDisplay(
-				date.getFullYear(),
-				date.getMonth() + 1,
-				date.getDate(),
-				date.getHours(),
-				date.getMinutes(),
-				date.getSeconds(),
-				this.currentData.gender
-			);
-		};
-
-		// 绑定按钮事件
-		yearMinusBtn.addEventListener('click', () => adjustTime(-1, 0, 0, 0));
-		monthMinusBtn.addEventListener('click', () => adjustTime(0, -1, 0, 0));
-		dayMinusBtn.addEventListener('click', () => adjustTime(0, 0, -1, 0));
-		hourMinusBtn.addEventListener('click', () => adjustTime(0, 0, 0, -1));
-		yearPlusBtn.addEventListener('click', () => adjustTime(1, 0, 0, 0));
-		monthPlusBtn.addEventListener('click', () => adjustTime(0, 1, 0, 0));
-		dayPlusBtn.addEventListener('click', () => adjustTime(0, 0, 1, 0));
-		hourPlusBtn.addEventListener('click', () => adjustTime(0, 0, 0, 1));
-
 		// 回到现在按钮
 		const currentTimeBtn = container.createEl('button', { text: '回到现在' });
 		currentTimeBtn.style.marginTop = '20px';
@@ -154,7 +94,8 @@ export class BaziView extends ItemView {
 			now.getHours(),
 			now.getMinutes(),
 			now.getSeconds(),
-			0 // 默认男
+			0, // 默认男
+			'案例' // 默认姓名
 		);
 	}
 
@@ -172,7 +113,7 @@ export class BaziView extends ItemView {
 		});
 	}
 
-	calculateAndDisplay(year: number, month: number, day: number, hour: number, minute: number, second: number, gender: number) {
+	calculateAndDisplay(year: number, month: number, day: number, hour: number, minute: number, second: number, gender: number, name: string = '案例') {
 		try {
 			const bazi = this.paipan.fatemaps(gender, year, month, day, hour, minute, second);
 			const solarTerms = this.paipan.getNearbySolarTerms(year, month, day);
@@ -206,8 +147,14 @@ export class BaziView extends ItemView {
 				}
 			}
 
+			// 如果姓名是默认的"案例"，自动设置为排盘码格式
+			if (name === '案例') {
+				const genderCode = gender === 0 ? 'Y' : 'X';
+				name = `${String(year)}.${String(month).padStart(2, '0')}.${String(day).padStart(2, '0')}-${String(hour).padStart(2, '0')}.${String(minute).padStart(2, '0')}-${genderCode}`;
+			}
+
 			this.currentData = {
-				year, month, day, hour, minute, second, gender,
+				year, month, day, hour, minute, second, gender, name,
 				bazi,
 				solarTerms,
 				dayun: dayunData,
@@ -232,16 +179,15 @@ export class BaziView extends ItemView {
 		// 时间显示
 		const timeDiv = resultContainer.createEl('div');
 		const date = new Date(data.year, data.month - 1, data.day, data.hour, data.minute, data.second);
-		timeDiv.createEl('p', { text: `公历: ${date.getFullYear()}年${data.month}月${data.day}日 ${String(data.hour).padStart(2, '0')}:${String(data.minute).padStart(2, '0')}:${String(data.second).padStart(2, '0')}` });
 
-		// 真太阳时显示
+		// 真太阳时与公历在同一行展示
+		let timeText = `公历: ${date.getFullYear()}年${data.month}月${data.day}日 ${String(data.hour).padStart(2, '0')}:${String(data.minute).padStart(2, '0')}:${String(data.second).padStart(2, '0')}`;
 		if (data.bazi.zty) {
 			const zty = data.bazi.zty;
 			const cityName = this.plugin.settings.city || '';
-			timeDiv.createEl('p', {
-				text: `真太阳时 (${cityName}): ${String(zty.hour).padStart(2, '0')}:${String(zty.minute).padStart(2, '0')}:${String(zty.second).padStart(2, '0')}`
-			});
+			timeText += ` | 真太阳时 (${cityName}): ${String(zty.hour).padStart(2, '0')}:${String(zty.minute).padStart(2, '0')}:${String(zty.second).padStart(2, '0')}`;
 		}
+		timeDiv.createEl('p', { text: timeText });
 
 		// 获取农历信息
 		const lunarDate = this.paipan.getLunarDate(data.year, data.month, data.day);
@@ -253,26 +199,100 @@ export class BaziView extends ItemView {
 			timeDiv.createEl('p', { text: `农历: [计算失败]` });
 		}
 
-		timeDiv.createEl('p', { text: `干支历: ${data.bazi.gztg[0]}${data.bazi.dz[0]}年 ${data.bazi.gztg[1]}${data.bazi.dz[1]}月 ${data.bazi.gztg[2]}${data.bazi.dz[2]}日 ${data.bazi.gztg[3]}${data.bazi.dz[3]}时` });
+		// 干支历与时辰调整按钮在同一行
+		const gzhRow = timeDiv.createEl('div');
+		gzhRow.addClass('gzh-row');
+		const gzhSpan = gzhRow.createEl('span');
+		gzhSpan.appendText('干支历: ');
+
+		// 年柱
+		const yearGanSpan = gzhSpan.createEl('span');
+		yearGanSpan.setText(data.bazi.gztg[0] || '');
+		yearGanSpan.addClass('c-' + this.paipan.getGanWuXing(data.bazi.gztg[0] || ''));
+		const yearZhiSpan = gzhSpan.createEl('span');
+		yearZhiSpan.setText(data.bazi.dz[0] || '');
+		yearZhiSpan.addClass('c-' + this.paipan.getZhiWuXing(data.bazi.dz[0] || ''));
+		gzhSpan.appendText('年 ');
+
+		// 月柱
+		const monthGanSpan = gzhSpan.createEl('span');
+		monthGanSpan.setText(data.bazi.gztg[1] || '');
+		monthGanSpan.addClass('c-' + this.paipan.getGanWuXing(data.bazi.gztg[1] || ''));
+		const monthZhiSpan = gzhSpan.createEl('span');
+		monthZhiSpan.setText(data.bazi.dz[1] || '');
+		monthZhiSpan.addClass('c-' + this.paipan.getZhiWuXing(data.bazi.dz[1] || ''));
+		gzhSpan.appendText('月 ');
+
+		// 日柱
+		const dayGanSpan = gzhSpan.createEl('span');
+		dayGanSpan.setText(data.bazi.gztg[2] || '');
+		dayGanSpan.addClass('c-' + this.paipan.getGanWuXing(data.bazi.gztg[2] || ''));
+		const dayZhiSpan = gzhSpan.createEl('span');
+		dayZhiSpan.setText(data.bazi.dz[2] || '');
+		dayZhiSpan.addClass('c-' + this.paipan.getZhiWuXing(data.bazi.dz[2] || ''));
+		gzhSpan.appendText('日 ');
+
+		// 时柱
+		const hourGanSpan = gzhSpan.createEl('span');
+		hourGanSpan.setText(data.bazi.gztg[3] || '');
+		hourGanSpan.addClass('c-' + this.paipan.getGanWuXing(data.bazi.gztg[3] || ''));
+		const hourZhiSpan = gzhSpan.createEl('span');
+		hourZhiSpan.setText(data.bazi.dz[3] || '');
+		hourZhiSpan.addClass('c-' + this.paipan.getZhiWuXing(data.bazi.dz[3] || ''));
+		gzhSpan.appendText('时');
+
+		// 时辰调整按钮
+		const hourMinusBtn = gzhRow.createEl('button', { text: '时↑' });
+		hourMinusBtn.addClass('hour-adjust-btn');
+		const hourPlusBtn = gzhRow.createEl('button', { text: '时↓' });
+		hourPlusBtn.addClass('hour-adjust-btn');
+
+		// 时间调整函数
+		const adjustTime = (hourDelta: number) => {
+			if (!this.currentData) {
+				new Notice('请先设置时间');
+				return;
+			}
+			const date = new Date(
+				this.currentData.year,
+				this.currentData.month - 1,
+				this.currentData.day,
+				this.currentData.hour,
+				this.currentData.minute,
+				this.currentData.second
+			);
+			date.setHours(date.getHours() + hourDelta);
+			this.calculateAndDisplay(
+				date.getFullYear(),
+				date.getMonth() + 1,
+				date.getDate(),
+				date.getHours(),
+				date.getMinutes(),
+				date.getSeconds(),
+				this.currentData.gender
+			);
+		};
+
+		// 绑定按钮事件
+		hourMinusBtn.addEventListener('click', () => adjustTime(-1));
+		hourPlusBtn.addEventListener('click', () => adjustTime(1));
 
 		// 节气信息
-    if (data.solarTerms.previous && data.solarTerms.next) {
-        const solarDiv = resultContainer.createEl('div');
-        const now = new Date();
-        const timeToNext = Math.floor((data.solarTerms.next.date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        const formatDateTime = (date: Date) => {
-            const hours = date.getHours().toString().padStart(2, '0');
-            const minutes = date.getMinutes().toString().padStart(2, '0');
-            return `${date.getMonth() + 1}/${date.getDate()} ${hours}:${minutes}`;
-        };
-        solarDiv.createEl('p', {
-            text: `节气：${data.solarTerms.previous.name} (${formatDateTime(data.solarTerms.previous.date)})-${data.solarTerms.next.name} (${formatDateTime(data.solarTerms.next.date)})-距离${timeToNext}天`
-        });
-    }
+		if (data.solarTerms.previous && data.solarTerms.next) {
+			const solarDiv = resultContainer.createEl('div');
+			const formatDateTime = (date: Date) => {
+				const hours = date.getHours().toString().padStart(2, '0');
+				const minutes = date.getMinutes().toString().padStart(2, '0');
+				return `${date.getMonth() + 1}/${date.getDate()} ${hours}:${minutes}`;
+			};
+			solarDiv.createEl('p', {
+				text: `节气：${data.solarTerms.previous.name} (${formatDateTime(data.solarTerms.previous.date)})-${data.solarTerms.next.name} (${formatDateTime(data.solarTerms.next.date)})`
+			});
+		}
 
 		// 干支四柱表格
 		this.createBaziTable(resultContainer, data);
-		
+
 		// 大运信息
 		const dayunDiv = resultContainer.createEl('div');
 		dayunDiv.createEl('p', { text: `起运时间: ${data.dayun.startAge}岁` });
@@ -462,7 +482,7 @@ export class BaziView extends ItemView {
 		const dayunZhi = selectedDayun.zhi;
 
 		// 四柱干支
-		const pillars: Array<{name: string, gan: string, zhi: string}> = [
+		const pillars: Array<{ name: string, gan: string, zhi: string }> = [
 			{ name: '年柱', gan: data.bazi.gztg[0] || '', zhi: data.bazi.dz[0] || '' },
 			{ name: '月柱', gan: data.bazi.gztg[1] || '', zhi: data.bazi.dz[1] || '' },
 			{ name: '日柱', gan: data.bazi.gztg[2] || '', zhi: data.bazi.dz[2] || '' },
@@ -487,7 +507,7 @@ export class BaziView extends ItemView {
 
 		// 第二行：十神关系
 		// columns数组: 对应表格的列（年柱、月柱、日柱、时柱、大运、流年）
-		const columns: Array<{gan: string, zhi: string, gz: string}> = [
+		const columns: Array<{ gan: string, zhi: string, gz: string }> = [
 			{ gan: pillars[0]!.gan, zhi: pillars[0]!.zhi, gz: pillars[0]!.gan + pillars[0]!.zhi },
 			{ gan: pillars[1]!.gan, zhi: pillars[1]!.zhi, gz: pillars[1]!.gan + pillars[1]!.zhi },
 			{ gan: pillars[2]!.gan, zhi: pillars[2]!.zhi, gz: pillars[2]!.gan + pillars[2]!.zhi },
@@ -502,12 +522,12 @@ export class BaziView extends ItemView {
 		// 十神行：每列天干与日干的十神关系
 		const shishenRow = table.createEl('tr');
 		['十神',
-		 this.paipan.getShiShenFull(riZhuGan, columns[0]!.gan),  // 年柱天干 vs 日干
-		 this.paipan.getShiShenFull(riZhuGan, columns[1]!.gan),  // 月柱天干 vs 日干
-		 genderText,                                               // 日柱：元男或元女
-		 this.paipan.getShiShenFull(riZhuGan, columns[3]!.gan),  // 时柱天干 vs 日干
-		 this.paipan.getShiShenFull(riZhuGan, columns[4]!.gan),  // 大运天干 vs 日干
-		 this.paipan.getShiShenFull(riZhuGan, columns[5]!.gan)   // 流年天干 vs 日干
+			this.paipan.getShiShenFull(riZhuGan, columns[0]!.gan),  // 年柱天干 vs 日干
+			this.paipan.getShiShenFull(riZhuGan, columns[1]!.gan),  // 月柱天干 vs 日干
+			genderText,                                               // 日柱：元男或元女
+			this.paipan.getShiShenFull(riZhuGan, columns[3]!.gan),  // 时柱天干 vs 日干
+			this.paipan.getShiShenFull(riZhuGan, columns[4]!.gan),  // 大运天干 vs 日干
+			this.paipan.getShiShenFull(riZhuGan, columns[5]!.gan)   // 流年天干 vs 日干
 		].forEach(text => {
 			const td = shishenRow.createEl('td');
 			td.setText(text);
@@ -516,7 +536,7 @@ export class BaziView extends ItemView {
 
 		// 后续数据行
 		// 主气、中气、余气需要添加十神，天干有颜色，十神无颜色
-		const getCangQiWithShiShen = (c: {gan: string, zhi: string}, type: 'main' | 'middle' | 'residual'): { gan: string, shishen: string, wuxing: string } => {
+		const getCangQiWithShiShen = (c: { gan: string, zhi: string }, type: 'main' | 'middle' | 'residual'): { gan: string, shishen: string, wuxing: string } => {
 			const cangQi = this.paipan.getCangQi(c.zhi);
 			const gan = type === 'main' ? cangQi.main : type === 'middle' ? cangQi.middle : cangQi.residual;
 			if (!gan) return { gan: '', shishen: '', wuxing: '' };
@@ -529,17 +549,18 @@ export class BaziView extends ItemView {
 			label: string;
 			values: Array<{ gan?: string, shishen?: string, wuxing?: string, text?: string }>;
 			isCangQi?: boolean;
+			isXunKong?: boolean;
 		}> = [
-			{ label: '天干', values: columns.map(c => ({ text: c.gan, wuxing: this.paipan.getGanWuXing(c.gan) })) },
-			{ label: '地支', values: columns.map(c => ({ text: c.zhi, wuxing: this.paipan.getZhiWuXing(c.zhi) })) },
-			{ label: '主气', values: columns.map(c => getCangQiWithShiShen(c, 'main')), isCangQi: true },
-			{ label: '中气', values: columns.map(c => getCangQiWithShiShen(c, 'middle')), isCangQi: true },
-			{ label: '余气', values: columns.map(c => getCangQiWithShiShen(c, 'residual')), isCangQi: true },
-			{ label: '纳音', values: columns.map(c => ({ text: this.paipan.getNaYin(c.gz) })) },
-			{ label: '星运', values: columns.map(c => ({ text: this.paipan.getXingYun(riZhuGan, c.zhi) })) },
-			{ label: '自坐', values: columns.map(c => ({ text: this.paipan.getZiZuo(c.gan, c.zhi) })) },
-			{ label: '空亡', values: columns.map(c => ({ text: this.paipan.getXunKong(c.gz) })) }
-		];
+				{ label: '天干', values: columns.map(c => ({ text: c.gan, wuxing: this.paipan.getGanWuXing(c.gan) })) },
+				{ label: '地支', values: columns.map(c => ({ text: c.zhi, wuxing: this.paipan.getZhiWuXing(c.zhi) })) },
+				{ label: '人元', values: columns.map(c => getCangQiWithShiShen(c, 'main')), isCangQi: true },
+				{ label: '', values: columns.map(c => getCangQiWithShiShen(c, 'middle')), isCangQi: true },
+				{ label: '', values: columns.map(c => getCangQiWithShiShen(c, 'residual')), isCangQi: true },
+				{ label: '纳音', values: columns.map(c => ({ text: this.paipan.getNaYin(c.gz) })) },
+				{ label: '星运', values: columns.map(c => ({ text: this.paipan.getXingYun(riZhuGan, c.zhi) })) },
+				{ label: '自坐', values: columns.map(c => ({ text: this.paipan.getZiZuo(c.gan, c.zhi) })) },
+				{ label: '空亡', values: columns.map(c => ({ text: this.paipan.getXunKong(c.gz) })), isXunKong: true }
+			];
 
 		rowConfig.forEach(rowData => {
 			const row = table.createEl('tr');
@@ -557,12 +578,19 @@ export class BaziView extends ItemView {
 						ganSpan.setText(val.gan);
 						if (val.wuxing) {
 							ganSpan.addClass('c-' + val.wuxing);
+							ganSpan.style.fontWeight = '600';
 						}
 					}
 					if (val.shishen) {
 						const shishenSpan = td.createEl('span');
 						shishenSpan.setText(val.shishen);
 						// 十神不需要颜色，使用默认颜色
+					}
+				} else if (rowData.isXunKong) {
+					// 空亡行：日柱对应的空亡加粗显示
+					td.setText(val.text || '');
+					if (idx === 2) { // 日柱是第3列（索引为2）
+						td.style.fontWeight = 'bold';
 					}
 				} else {
 					// 其他行：整体应用颜色
@@ -604,13 +632,15 @@ export class BaziView extends ItemView {
 			return;
 		}
 
-		const modal = new TitleInputModal(this.app, (title: string) => {
-			if (title) {
-				void this.plugin.saveBaziToFile(title, this.currentData!);
-			}
-		});
-		modal.open();
-	}}
+		// 生成排盘码作为默认标题
+		const genderCode = this.currentData.gender === 0 ? 'Y' : 'X';
+		const defaultTitle = `${String(this.currentData.year)}.${String(this.currentData.month).padStart(2, '0')}.${String(this.currentData.day).padStart(2, '0')}-${String(this.currentData.hour).padStart(2, '0')}.${String(this.currentData.minute).padStart(2, '0')}-${genderCode}`;
+
+		// 如果用户已输入姓名，使用姓名；否则使用排盘码
+		const title = this.currentData.name && this.currentData.name !== defaultTitle ? this.currentData.name : defaultTitle;
+		void this.plugin.saveBaziToFile(title, this.currentData);
+	}
+}
 
 class TitleInputModal extends Modal {
 	onSubmit: (title: string) => void;
@@ -689,13 +719,39 @@ class TimeSettingModal extends Modal {
 
 		const tabButtons = tabContainer.createEl('div');
 		tabButtons.setCssProps({ display: 'flex', marginBottom: '10px' });
+		const tabButtonElements: HTMLButtonElement[] = [];
 		tabs.forEach((tab, index) => {
 			const btn = tabButtons.createEl('button', { text: tab });
+			tabButtonElements.push(btn);
 			btn.addEventListener('click', () => {
 				activeTab = index;
+				// 更新所有按钮的样式
+				tabButtonElements.forEach((button, i) => {
+					if (i === index) {
+						button.setCssProps({
+							backgroundColor: 'var(--background-secondary)',
+							color: 'var(--interactive-accent)',
+							border: 'none'
+						});
+					} else {
+						button.setCssProps({
+							backgroundColor: '#f1f1f1',
+							color: 'black',
+							border: '1px solid #ccc'
+						});
+					}
+				});
 				this.renderTabContent(contentEl, activeTab);
 			});
 		});
+		// 初始化第一个按钮为选中状态
+		if (tabButtonElements.length > 0 && tabButtonElements[0]) {
+			tabButtonElements[0].setCssProps({
+				backgroundColor: 'var(--background-secondary)',
+				color: 'var(--interactive-accent)',
+				border: 'none'
+			});
+		}
 
 		this.renderTabContent(contentEl, activeTab);
 	}
@@ -708,6 +764,65 @@ class TimeSettingModal extends Modal {
 		const tabContent = contentEl.createEl('div');
 		tabContent.addClass('tab-content');
 
+		// 姓名和性别在同一行
+		const nameGenderRow = tabContent.createEl('div');
+		nameGenderRow.setCssProps({ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '15px' });
+
+		// 姓名输入
+		const nameLabel = nameGenderRow.createEl('label', { text: '姓名: ' });
+
+		// 生成排盘码作为默认值
+		const currentData = this.view.currentData;
+		let defaultName = '案例';
+		if (currentData) {
+			const genderCode = currentData.gender === 0 ? 'Y' : 'X';
+			defaultName = `${String(currentData.year)}.${String(currentData.month).padStart(2, '0')}.${String(currentData.day).padStart(2, '0')}-${String(currentData.hour).padStart(2, '0')}.${String(currentData.minute).padStart(2, '0')}-${genderCode}`;
+		}
+
+		const nameInput = nameGenderRow.createEl('input', {
+			type: 'text',
+			value: defaultName
+		});
+		nameInput.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '3px' });
+
+		// 点击后自动清除默认文本
+		nameInput.addEventListener('focus', () => {
+			if (nameInput.value === defaultName) {
+				nameInput.value = '';
+			}
+		});
+
+		// 失去焦点时，如果未填写文本则恢复默认文本
+		nameInput.addEventListener('blur', () => {
+			if (nameInput.value.trim() === '') {
+				nameInput.value = defaultName;
+			}
+		});
+
+		// 性别选择
+		const genderLabel = nameGenderRow.createEl('label', { text: '性别: ' });
+		const genderContainer = nameGenderRow.createEl('div');
+		genderContainer.setCssProps({ display: 'flex', gap: '10px' });
+
+		// 男单选按钮
+		const maleRadio = genderContainer.createEl('input', {
+			type: 'radio',
+			value: '0'
+		});
+		maleRadio.setAttribute('name', 'gender');
+		maleRadio.checked = true;
+		const maleLabel = genderContainer.createEl('label', { text: '男' });
+		maleLabel.setCssProps({ cursor: 'pointer', marginLeft: '5px' });
+
+		// 女单选按钮
+		const femaleRadio = genderContainer.createEl('input', {
+			type: 'radio',
+			value: '1'
+		});
+		femaleRadio.setAttribute('name', 'gender');
+		const femaleLabel = genderContainer.createEl('label', { text: '女' });
+		femaleLabel.setCssProps({ cursor: 'pointer', marginLeft: '5px' });
+
 		if (tabIndex === 0) { // 公历
 			this.renderGregorianTab(tabContent);
 		} else if (tabIndex === 1) { // 农历
@@ -715,13 +830,6 @@ class TimeSettingModal extends Modal {
 		} else if (tabIndex === 2) { // 干支
 			this.renderBaziTab(tabContent);
 		}
-
-		// 性别选择
-		const genderContainer = tabContent.createEl('div');
-		genderContainer.createEl('label', { text: '性别: ' });
-		const genderSelect = genderContainer.createEl('select');
-		genderSelect.createEl('option', { text: '男', value: '0' });
-		genderSelect.createEl('option', { text: '女', value: '1' });
 
 		// 城市选择 - 两级联动
 		const cityContainer = tabContent.createEl('div');
@@ -804,7 +912,7 @@ class TimeSettingModal extends Modal {
 		submitBtn.addEventListener('click', () => {
 			// 根据tabIndex获取时间并计算
 			let year: number, month: number, day: number, hour: number, minute: number, second: number;
-			const gender = parseInt((genderSelect as HTMLSelectElement).value);
+			const gender = parseInt(maleRadio.checked ? '0' : '1');
 
 			// 获取选择的城市并更新设置
 			const selectedCity = (citySelect as HTMLSelectElement).value;
@@ -822,24 +930,47 @@ class TimeSettingModal extends Modal {
 			if (tabIndex === 0) {
 				// 公历
 				const selects = tabContent.querySelectorAll('select');
+				// 性别选择是input元素，不是select元素，所以selects[0]就是年选择
 				year = parseInt((selects[0] as HTMLSelectElement).value);
 				month = parseInt((selects[1] as HTMLSelectElement).value);
 				day = parseInt((selects[2] as HTMLSelectElement).value);
 				hour = parseInt((selects[3] as HTMLSelectElement).value);
 				minute = parseInt((selects[4] as HTMLSelectElement).value);
-				second = parseInt((selects[5] as HTMLSelectElement).value);
+				// 使用当前盘面的秒级信息
+				second = this.view.currentData?.second ?? new Date().getSeconds();
 			} else if (tabIndex === 1) {
 				// 农历 - 需要转换
-				// 暂时使用公历逻辑，实际需要农历转换
-				new Notice('农历输入暂未实现');
-				return;
+				const selects = tabContent.querySelectorAll('select');
+				// 性别选择是input元素，不是select元素，所以selects[0]就是年选择
+				const lunarYear = parseInt((selects[0] as HTMLSelectElement).value);
+				const monthValue = parseInt((selects[1] as HTMLSelectElement).value);
+				// 判断是否为闰月（大于12的值表示闰月）
+				const isLeap = monthValue > 12;
+				const lunarMonth = isLeap ? monthValue - 12 : monthValue;
+				const lunarDay = parseInt((selects[2] as HTMLSelectElement).value);
+				hour = parseInt((selects[3] as HTMLSelectElement).value);
+				minute = parseInt((selects[4] as HTMLSelectElement).value);
+				// 使用当前盘面的秒级信息
+				second = this.view.currentData?.second ?? new Date().getSeconds();
+
+				// 调用paipan.js中的Lunar2Solar方法将农历转换为公历
+				const solarDate = this.view.paipan.lunarToSolar(lunarYear, lunarMonth, lunarDay, isLeap);
+				if (!solarDate) {
+					new Notice('农历转换失败，请检查输入的农历日期');
+					return;
+				}
+				year = solarDate.year;
+				month = solarDate.month;
+				day = solarDate.day;
 			} else {
 				// 干支 - 需要倒推
 				new Notice('干支倒推暂未实现');
 				return;
 			}
 
-			this.view.calculateAndDisplay(year, month, day, hour, minute, second, gender);
+			// 获取姓名信息
+			const name = (nameInput as HTMLInputElement).value || '案例';
+			this.view.calculateAndDisplay(year, month, day, hour, minute, second, gender, name);
 			this.close();
 		});
 	}
@@ -852,73 +983,435 @@ class TimeSettingModal extends Modal {
 		const currentDay = currentData?.day ?? now.getDate();
 		const currentHour = currentData?.hour ?? now.getHours();
 		const currentMinute = currentData?.minute ?? now.getMinutes();
-		const currentSecond = currentData?.second ?? now.getSeconds();
+
+		// 创建时间选择容器，所有下拉列表在同一行
+		const timeRow = container.createEl('div');
+		timeRow.setCssProps({ display: 'flex', gap: '0', alignItems: 'center', marginBottom: '15px' });
+
+		// 时间标签
+		timeRow.createEl('label', { text: '时间：' });
 
 		// 年
-		const yearContainer = container.createEl('div');
-		yearContainer.createEl('label', { text: '年: ' });
-		const yearSelect = yearContainer.createEl('select');
+		const yearSelect = timeRow.createEl('select');
+		yearSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
 		for (let y = 1600; y <= 2100; y++) {
 			yearSelect.createEl('option', { text: y.toString(), value: y.toString() });
 		}
 		yearSelect.value = currentYear.toString();
 
 		// 月
-		const monthContainer = container.createEl('div');
-		monthContainer.createEl('label', { text: '月: ' });
-		const monthSelect = monthContainer.createEl('select');
+		const monthSelect = timeRow.createEl('select');
+		monthSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
 		for (let m = 1; m <= 12; m++) {
 			monthSelect.createEl('option', { text: m.toString(), value: m.toString() });
 		}
 		monthSelect.value = currentMonth.toString();
 
 		// 日
-		const dayContainer = container.createEl('div');
-		dayContainer.createEl('label', { text: '日: ' });
-		const daySelect = dayContainer.createEl('select');
+		const daySelect = timeRow.createEl('select');
+		daySelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
 		for (let d = 1; d <= 31; d++) {
 			daySelect.createEl('option', { text: d.toString(), value: d.toString() });
 		}
 		daySelect.value = currentDay.toString();
 
 		// 时
-		const hourContainer = container.createEl('div');
-		hourContainer.createEl('label', { text: '时: ' });
-		const hourSelect = hourContainer.createEl('select');
+		const hourSelect = timeRow.createEl('select');
+		hourSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
 		for (let h = 0; h < 24; h++) {
 			hourSelect.createEl('option', { text: h.toString(), value: h.toString() });
 		}
 		hourSelect.value = currentHour.toString();
 
 		// 分
-		const minuteContainer = container.createEl('div');
-		minuteContainer.createEl('label', { text: '分: ' });
-		const minuteSelect = minuteContainer.createEl('select');
+		const minuteSelect = timeRow.createEl('select');
+		minuteSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0' });
 		for (let m = 0; m < 60; m++) {
 			minuteSelect.createEl('option', { text: m.toString(), value: m.toString() });
 		}
 		minuteSelect.value = currentMinute.toString();
-
-		// 秒
-		const secondContainer = container.createEl('div');
-		secondContainer.createEl('label', { text: '秒: ' });
-		const secondSelect = secondContainer.createEl('select');
-		for (let s = 0; s < 60; s++) {
-			secondSelect.createEl('option', { text: s.toString(), value: s.toString() });
-		}
-		secondSelect.value = currentSecond.toString();
 	}
 
 	renderLunarTab(container: Element) {
-		container.createEl('p', { text: '农历输入功能开发中...' });
+		const now = new Date();
+		const currentData = this.view.currentData;
+
+		// 获取当前日期的农历信息作为默认值
+		let currentYear = now.getFullYear();
+		let currentMonth = now.getMonth() + 1;
+		let currentDay = now.getDate();
+		let currentHour = now.getHours();
+		let currentMinute = now.getMinutes();
+		let isLeap = false;
+
+		if (currentData) {
+			const lunarDate = this.view.paipan.getLunarDate(currentData.year, currentData.month, currentData.day);
+			if (lunarDate) {
+				currentYear = lunarDate.year;
+				currentMonth = lunarDate.month;
+				currentDay = lunarDate.day;
+				isLeap = lunarDate.isLeap;
+			}
+			currentHour = currentData.hour;
+			currentMinute = currentData.minute;
+		}
+
+		// 创建时间选择容器，所有下拉列表在同一行
+		const timeRow = container.createEl('div');
+		timeRow.setCssProps({ display: 'flex', gap: '0', alignItems: 'center', marginBottom: '15px' });
+
+		// 时间标签
+		timeRow.createEl('label', { text: '时间：' });
+
+		// 年
+		const yearSelect = timeRow.createEl('select');
+		yearSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+		for (let y = 1900; y <= 2100; y++) {
+			yearSelect.createEl('option', { text: y.toString(), value: y.toString() });
+		}
+		yearSelect.value = currentYear.toString();
+
+		// 月
+		const monthSelect = timeRow.createEl('select');
+		monthSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+
+		// 根据年份获取月份列表，包括闰月
+		const updateMonthOptions = (year: number) => {
+			monthSelect.innerHTML = '';
+			const monthNames = ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月'];
+
+			// 获取该年的闰月信息
+			const leapMonth = this.view.paipan.getLeapMonth(year);
+
+			// 添加普通月份
+			for (let m = 1; m <= 12; m++) {
+				const value = m.toString();
+				const text = monthNames[m - 1];
+				monthSelect.createEl('option', { text, value });
+			}
+
+			// 如果有闰月，添加闰月选项
+			if (leapMonth > 0) {
+				const leapValue = (leapMonth + 12).toString(); // 使用大于12的值表示闰月
+				const leapText = '闰' + monthNames[leapMonth - 1];
+				monthSelect.createEl('option', { text: leapText, value: leapValue });
+			}
+
+			// 尝试保持之前选中的月份
+			if (currentMonth <= 12) {
+				monthSelect.value = currentMonth.toString();
+			} else if (leapMonth > 0 && currentMonth - 12 === leapMonth) {
+				monthSelect.value = (leapMonth + 12).toString();
+			}
+		};
+
+		// 初始化月份选项
+		updateMonthOptions(currentYear);
+
+		// 年份变化时更新月份选项
+		yearSelect.addEventListener('change', () => {
+			const year = parseInt((yearSelect as HTMLSelectElement).value);
+			updateMonthOptions(year);
+		});
+
+		// 日
+		const daySelect = timeRow.createEl('select');
+		daySelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+		const dayNames = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+			'十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+			'廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
+		for (let d = 1; d <= 30; d++) {
+			daySelect.createEl('option', { text: dayNames[d - 1], value: d.toString() });
+		}
+		daySelect.value = currentDay.toString();
+
+		// 时
+		const hourSelect = timeRow.createEl('select');
+		hourSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+		for (let h = 0; h < 24; h++) {
+			hourSelect.createEl('option', { text: h.toString(), value: h.toString() });
+		}
+		hourSelect.value = currentHour.toString();
+
+		// 分
+		const minuteSelect = timeRow.createEl('select');
+		minuteSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0' });
+		for (let m = 0; m < 60; m++) {
+			minuteSelect.createEl('option', { text: m.toString(), value: m.toString() });
+		}
+		minuteSelect.value = currentMinute.toString();
 	}
 
 	renderBaziTab(container: Element) {
-		container.createEl('p', { text: '干支倒推功能开发中...' });
-	}
+		// 获取当前公历时间
+		const currentData = this.view.currentData;
+		const now = new Date();
+		const year = currentData?.year ?? now.getFullYear();
+		const month = currentData?.month ?? now.getMonth() + 1;
+		const day = currentData?.day ?? now.getDate();
+		const hour = currentData?.hour ?? now.getHours();
 
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
+		// 调用paipan.js中的方法计算干支
+		const baziResult = this.view.paipan.fatemaps(0, year, month, day, hour, 0, 0);
+		// gztg是天干数组，dz是地支数组
+		const bazi = {
+			yearGan: baziResult.gztg[0],
+			monthGan: baziResult.gztg[1],
+			dayGan: baziResult.gztg[2],
+			hourGan: baziResult.gztg[3],
+			yearZhi: baziResult.dz[0],
+			monthZhi: baziResult.dz[1],
+			dayZhi: baziResult.dz[2],
+			hourZhi: baziResult.dz[3]
+		};
+
+		// 天干列表
+		const ganList = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+		// 地支列表
+		const zhiList = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+		// 阳干
+		const yangGan = ['甲', '丙', '戊', '庚', '壬'];
+		// 阴干
+		const yinGan = ['乙', '丁', '己', '辛', '癸'];
+		// 阳支
+		const yangZhi = ['子', '寅', '辰', '午', '申', '戌'];
+		// 阴支
+		const yinZhi = ['丑', '卯', '巳', '未', '酉', '亥'];
+
+		// 第一排：天干下拉列表
+		const ganRow = container.createEl('div');
+		ganRow.setCssProps({ display: 'flex', gap: '10px', marginBottom: '10px' });
+
+		// 年柱天干
+		const yearGanSelect = ganRow.createEl('select');
+		ganList.forEach(gan => {
+			yearGanSelect.createEl('option', { text: gan, value: gan });
+		});
+		// 设置年干的默认值为计算值
+		if (bazi?.yearGan) {
+			yearGanSelect.value = bazi.yearGan;
+		}
+
+		// 月柱天干（不可选，由年干和月支自动计算）
+		const monthGanSelect = ganRow.createEl('select');
+		monthGanSelect.disabled = true; // 设置为不可选
+		// 添加所有天干选项
+		ganList.forEach(gan => {
+			monthGanSelect.createEl('option', { text: gan, value: gan });
+		});
+
+		// 日柱天干
+		const dayGanSelect = ganRow.createEl('select');
+		ganList.forEach(gan => {
+			dayGanSelect.createEl('option', { text: gan, value: gan });
+		});
+		// 设置日干的默认值为计算值
+		if (bazi?.dayGan) {
+			dayGanSelect.value = bazi.dayGan;
+		}
+
+		// 时柱天干（不可选，由日干和时支自动计算）
+		const hourGanSelect = ganRow.createEl('select');
+		hourGanSelect.disabled = true; // 设置为不可选
+		// 添加所有天干选项
+		ganList.forEach(gan => {
+			hourGanSelect.createEl('option', { text: gan, value: gan });
+		});
+
+		// 第二排：地支下拉列表
+		const zhiRow = container.createEl('div');
+		zhiRow.setCssProps({ display: 'flex', gap: '10px' });
+
+		// 年柱地支
+		const yearZhiSelect = zhiRow.createEl('select');
+		const updateYearZhiOptions = () => {
+			const selectedGan = yearGanSelect.value;
+			yearZhiSelect.innerHTML = '';
+			const zhiOptions = yangGan.includes(selectedGan) ? yangZhi : yinZhi;
+			zhiOptions.forEach(zhi => {
+				yearZhiSelect.createEl('option', { text: zhi, value: zhi });
+			});
+		};
+		yearGanSelect.addEventListener('change', updateYearZhiOptions);
+		updateYearZhiOptions(); // 初始化年柱地支选项
+		// 设置年支的默认值为计算值
+		if (bazi?.yearZhi) {
+			yearZhiSelect.value = bazi.yearZhi;
+		}
+
+		// 月柱地支
+		const monthZhiSelect = zhiRow.createEl('select');
+		// 五虎遁：根据年干和月支确定月干
+		const updateMonthGanByYear = () => {
+			const yearGan = yearGanSelect.value;
+			const monthZhi = monthZhiSelect.value;
+
+			// 五虎遁口诀：甲己之年丙作首，乙庚之岁戊为头，丙辛之岁寻庚上，丁壬壬寅顺水流，若问戊癸何方发，甲寅之上好追求。
+			// 寅月的月干：甲己->丙，乙庚->戊，丙辛->庚，丁壬->壬，戊癸->甲
+			const yinMonthGan: { [key: string]: string } = {
+				'甲': '丙',
+				'己': '丙',
+				'乙': '戊',
+				'庚': '戊',
+				'丙': '庚',
+				'辛': '庚',
+				'丁': '壬',
+				'壬': '壬',
+				'戊': '甲',
+				'癸': '甲'
+			};
+
+			// 地支顺序：子丑寅卯辰巳午未申酉戌亥
+			const zhiOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+			const monthIndex = zhiOrder.indexOf(monthZhi);
+			const yinIndex = zhiOrder.indexOf('寅');
+
+			// 计算月干：从寅月开始，每过一个月，月干向后推一位
+			const yinGan = yinMonthGan[yearGan];
+			if (!yinGan) return; // 如果找不到对应的寅月天干，则不更新
+			const ganOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+			const yinGanIndex = ganOrder.indexOf(yinGan);
+			const monthGanIndex = (yinGanIndex + monthIndex - yinIndex + 10) % 10;
+			const monthGan = ganOrder[monthGanIndex];
+
+			// 设置月干的选中值
+			if (monthGan) {
+				monthGanSelect.value = monthGan;
+			}
+		};
+
+		// 初始化月支选项
+		zhiList.forEach(zhi => {
+			monthZhiSelect.createEl('option', { text: zhi, value: zhi });
+		});
+		// 设置月支的默认值为计算值
+		if (bazi?.monthZhi) {
+			monthZhiSelect.value = bazi.monthZhi;
+		}
+
+		// 添加事件监听
+		yearGanSelect.addEventListener('change', updateMonthGanByYear);
+		monthZhiSelect.addEventListener('change', updateMonthGanByYear);
+
+		// 初始化月干
+		updateMonthGanByYear();
+
+		// 日柱地支
+		const dayZhiSelect = zhiRow.createEl('select');
+		const updateDayZhiOptions = () => {
+			const selectedGan = dayGanSelect.value;
+			dayZhiSelect.innerHTML = '';
+			const zhiOptions = yangGan.includes(selectedGan) ? yangZhi : yinZhi;
+			zhiOptions.forEach(zhi => {
+				dayZhiSelect.createEl('option', { text: zhi, value: zhi });
+			});
+		};
+		dayGanSelect.addEventListener('change', updateDayZhiOptions);
+		updateDayZhiOptions(); // 初始化日柱地支选项
+		// 设置日支的默认值为计算值
+		if (bazi?.dayZhi) {
+			dayZhiSelect.value = bazi.dayZhi;
+		}
+
+		// 时柱地支
+		const hourZhiSelect = zhiRow.createEl('select');
+		zhiList.forEach(zhi => {
+			hourZhiSelect.createEl('option', { text: zhi, value: zhi });
+		});
+		// 添加晚子时选项（23:00-24:00）
+		hourZhiSelect.createEl('option', { text: '子', value: '晚子时' });
+		// 设置时支的默认值为计算值
+		if (bazi?.hourZhi) {
+			hourZhiSelect.value = bazi.hourZhi;
+		}
+
+		// 五鼠遁：根据日干和时支确定时干
+		const updateHourGanByDay = () => {
+			const dayGan = dayGanSelect.value;
+			const hourZhi = hourZhiSelect.value;
+
+			// 五鼠遁口诀：甲己还加甲，乙庚丙作初，丙辛从戊起，丁壬庚子居，戊癸何方发，壬子是真途。
+			// 子时的时干：甲己->甲，乙庚->丙，丙辛->戊，丁壬->庚，戊癸->壬
+			const ziHourGan: { [key: string]: string } = {
+				'甲': '甲',
+				'己': '甲',
+				'乙': '丙',
+				'庚': '丙',
+				'丙': '戊',
+				'辛': '戊',
+				'丁': '庚',
+				'壬': '庚',
+				'戊': '壬',
+				'癸': '壬'
+			};
+
+			// 地支顺序：子丑寅卯辰巳午未申酉戌亥
+			const zhiOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+
+			let hourGan: string = '';
+
+			if (hourZhi === '晚子时') {
+				// 晚子时（23:00-24:00）：日柱前移一柱，时干使用下一个日干的子时天干
+				const ganOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+				const dayGanIndex = ganOrder.indexOf(dayGan);
+				if (dayGanIndex !== -1) {
+					const nextDayGan = ganOrder[(dayGanIndex + 1) % 10]; // 下一个日干
+					if (nextDayGan) {
+						const nextZiGan = ziHourGan[nextDayGan];
+						if (nextZiGan) {
+							hourGan = nextZiGan; // 使用下一个日干的子时天干
+						}
+					}
+				}
+			} else {
+				const hourIndex = zhiOrder.indexOf(hourZhi);
+				const ziIndex = zhiOrder.indexOf('子');
+
+				// 计算时干：从子时开始，每过一个时辰，时干向后推一位
+				const ziGan = ziHourGan[dayGan];
+				if (!ziGan) return; // 如果找不到对应的子时天干，则不更新
+				const ganOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
+				const ziGanIndex = ganOrder.indexOf(ziGan);
+				const hourGanIndex = (ziGanIndex + hourIndex - ziIndex + 10) % 10;
+				const calculatedHourGan = ganOrder[hourGanIndex];
+				if (calculatedHourGan) {
+					hourGan = calculatedHourGan;
+				}
+			}
+
+			// 设置时干的选中值
+			if (hourGan) {
+				hourGanSelect.value = hourGan;
+			}
+		};
+
+		// 添加事件监听
+		dayGanSelect.addEventListener('change', updateHourGanByDay);
+		hourZhiSelect.addEventListener('change', updateHourGanByDay);
+
+		// 初始化时干
+		updateHourGanByDay();
+
+		// 添加筛选按钮
+		const filterButton = container.createEl('button', {
+			text: '筛选符合四柱干支的时间',
+			cls: 'mod-cta'
+		});
+		filterButton.setCssProps({ marginTop: '20px', marginBottom: '10px' });
+
+		// 创建结果展示区域
+		const resultContainer = container.createEl('div', {
+			cls: 'bazi-filter-result'
+		});
+		resultContainer.setCssProps({
+			marginTop: '10px',
+			padding: '10px',
+			border: '1px solid #ddd',
+			borderRadius: '5px',
+			maxHeight: '300px',
+			overflowY: 'auto'
+		});
 	}
 }
+
+
