@@ -64,23 +64,23 @@ export class BaziView extends ItemView {
 		setTimeBtn.addEventListener('click', () => {
 			new TimeSettingModal(this.app, this).open();
 		});
-
-		// 结果显示区域
-		this.createResultArea(container);
-
+		
 		// 回到现在按钮
 		const currentTimeBtn = container.createEl('button', { text: '回到现在' });
 		currentTimeBtn.style.marginTop = '20px';
 		currentTimeBtn.addEventListener('click', () => {
 			this.loadCurrentTime();
 		});
-
+		
 		// 保存按钮
 		const saveBtn = container.createEl('button', { text: '保存案例' });
 		saveBtn.style.marginTop = '20px';
 		saveBtn.addEventListener('click', () => {
 			this.saveCase();
 		});
+		
+		// 结果显示区域
+		this.createResultArea(container);
 	}
 
 
@@ -103,8 +103,8 @@ export class BaziView extends ItemView {
 		const resultContainer = container.createEl('div');
 		resultContainer.id = 'bazi-result';
 		resultContainer.setCssProps({
-			marginTop: '20px',
-			padding: '10px',
+			marginTop: '0px',
+			padding: '5px',
 			border: '1px solid #ccc',
 			minHeight: '200px',
 			maxHeight: '400px',
@@ -286,7 +286,7 @@ export class BaziView extends ItemView {
 				return `${date.getMonth() + 1}/${date.getDate()} ${hours}:${minutes}`;
 			};
 			solarDiv.createEl('p', {
-				text: `节气：${data.solarTerms.previous.name} (${formatDateTime(data.solarTerms.previous.date)})-${data.solarTerms.next.name} (${formatDateTime(data.solarTerms.next.date)})`
+				text: `节气：${data.solarTerms.previous.name}${formatDateTime(data.solarTerms.previous.date)}-${data.solarTerms.next.name}${formatDateTime(data.solarTerms.next.date)}`
 			});
 		}
 
@@ -302,12 +302,12 @@ export class BaziView extends ItemView {
 		if (data.selectedDayunIndex === -1) {
 			// 小运模式
 			const xiaoyunYear = data.year + (data.selectedLiunianIndex ?? 0);
-			displayText = `当前小运 (流年: ${xiaoyunYear}年)`;
+			displayText = `当前小运 流年: ${xiaoyunYear}年`;
 		} else {
 			const selectedDayunForDisplay = data.dayun.allDayun[data.selectedDayunIndex ?? 0] || data.dayun.currentDayun;
 			const selectedLiunianIndex = data.selectedLiunianIndex ?? 0;
 			const selectedLiunianYear = selectedDayunForDisplay.startYear + selectedLiunianIndex;
-			displayText = `当前大运: ${selectedDayunForDisplay.age}岁 - ${selectedDayunForDisplay.gz} (流年: ${selectedLiunianYear}年)`;
+			displayText = `当前大运: ${selectedDayunForDisplay.age}岁 ${selectedDayunForDisplay.gz} 流年: ${selectedLiunianYear}年`;
 		}
 		dayunDiv.createEl('p', { text: displayText });
 
@@ -418,6 +418,21 @@ export class BaziView extends ItemView {
 			const ganShishen = this.paipan.getShiShen(riZhuGan, liuNianGanZhi.gan);
 			const zhiShishen = this.paipan.getZhiShiShen(riZhuGan, liuNianGanZhi.zhi);
 
+			// 计算小运干支（添加参数验证）
+			const hourGan = data.bazi.gztg[3] || '';
+			const hourZhi = data.bazi.dz[3] || '';
+			if (!hourGan || !hourZhi) {
+				console.error('时柱天干地支数据无效');
+				continue;
+			}
+			const xiaoYun = this.paipan.getXiaoYun(
+				hourGan,          // 时柱天干
+				hourZhi,          // 时柱地支
+				data.year,        // 出生年
+				data.gender,      // 性别
+				i                 // 年龄
+			);
+
 			const btn = liunianList.createEl('button', {
 				cls: (i === selectedLiunianIndex ? 'liunian-btn is-selected' : 'liunian-btn')
 			});
@@ -443,6 +458,11 @@ export class BaziView extends ItemView {
 			const zhiShishenSpan = zhiDiv.createEl('span');
 			zhiShishenSpan.setText(zhiShishen);
 			zhiDiv.addClass('liunian-zhi');
+			// 第四行：小运干支（作为独立行）
+			const xiaoYunRow = btn.createEl('div');
+			xiaoYunRow.setText(`${xiaoYun.gan}${xiaoYun.zhi}`);
+			xiaoYunRow.addClass('liunian-row');
+			xiaoYunRow.style.marginTop = '2px';
 
 			// 点击流年时选中该流年及其所属大运，小运模式下使用-1作为大运索引
 			btn.addEventListener('click', () => {
@@ -462,7 +482,7 @@ export class BaziView extends ItemView {
 		table.setCssProps({
 			width: '100%',
 			borderCollapse: 'collapse',
-			marginTop: '20px'
+			marginTop: '5px'
 		});
 
 		// 获取选中大运的年份范围和选中流年
@@ -703,9 +723,25 @@ class TitleInputModal extends Modal {
 class TimeSettingModal extends Modal {
 	view: BaziView;
 
+	// 存储选中的时间值
+	selectedYear: number;
+	selectedMonth: number;
+	selectedDay: number;
+	selectedHour: number;
+	selectedMinute: number;
+	selectedSecond: number;
+
 	constructor(app: App, view: BaziView) {
 		super(app);
 		this.view = view;
+
+		// 初始化时间值
+		this.selectedYear = 0;
+		this.selectedMonth = 0;
+		this.selectedDay = 0;
+		this.selectedHour = 0;
+		this.selectedMinute = 0;
+		this.selectedSecond = 0;
 	}
 
 	onOpen() {
@@ -812,7 +848,7 @@ class TimeSettingModal extends Modal {
 		maleRadio.setAttribute('name', 'gender');
 		maleRadio.checked = true;
 		const maleLabel = genderContainer.createEl('label', { text: '男' });
-		maleLabel.setCssProps({ cursor: 'pointer', marginLeft: '5px' });
+		maleLabel.setCssProps({ marginLeft: '5px' });
 
 		// 女单选按钮
 		const femaleRadio = genderContainer.createEl('input', {
@@ -821,7 +857,7 @@ class TimeSettingModal extends Modal {
 		});
 		femaleRadio.setAttribute('name', 'gender');
 		const femaleLabel = genderContainer.createEl('label', { text: '女' });
-		femaleLabel.setCssProps({ cursor: 'pointer', marginLeft: '5px' });
+		femaleLabel.setCssProps({ marginLeft: '5px' });
 
 		if (tabIndex === 0) { // 公历
 			this.renderGregorianTab(tabContent);
@@ -911,7 +947,12 @@ class TimeSettingModal extends Modal {
 		const submitBtn = buttonContainer.createEl('button', { text: '确定' });
 		submitBtn.addEventListener('click', () => {
 			// 根据tabIndex获取时间并计算
-			let year: number, month: number, day: number, hour: number, minute: number, second: number;
+			let year: number;
+			let month: number;
+			let day: number;
+			let hour: number;
+			let minute: number;
+			let second: number;
 			const gender = parseInt(maleRadio.checked ? '0' : '1');
 
 			// 获取选择的城市并更新设置
@@ -963,9 +1004,14 @@ class TimeSettingModal extends Modal {
 				month = solarDate.month;
 				day = solarDate.day;
 			} else {
-				// 干支 - 需要倒推
-				new Notice('干支倒推暂未实现');
-				return;
+				// 干支 - 使用筛选出来的选中的可选项的公历时间排盘
+				const now = new Date();
+				year = this.selectedYear || now.getFullYear();
+				month = this.selectedMonth || now.getMonth() + 1;
+				day = this.selectedDay || now.getDate();
+				hour = this.selectedHour || now.getHours();
+				minute = this.selectedMinute || 0;
+				second = this.selectedSecond || 0;
 			}
 
 			// 获取姓名信息
@@ -1271,7 +1317,12 @@ class TimeSettingModal extends Modal {
 			if (!yinGan) return; // 如果找不到对应的寅月天干，则不更新
 			const ganOrder = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
 			const yinGanIndex = ganOrder.indexOf(yinGan);
-			const monthGanIndex = (yinGanIndex + monthIndex - yinIndex + 10) % 10;
+			// 计算从寅月到当前月的偏移量
+			let monthOffset = monthIndex - yinIndex;
+			if (monthOffset < 0) {
+				monthOffset += 12; // 处理跨年情况
+			}
+			const monthGanIndex = (yinGanIndex + monthOffset) % 10;
 			const monthGan = ganOrder[monthGanIndex];
 
 			// 设置月干的选中值
@@ -1394,7 +1445,7 @@ class TimeSettingModal extends Modal {
 
 		// 添加筛选按钮
 		const filterButton = container.createEl('button', {
-			text: '筛选符合四柱干支的时间',
+			text: '筛选匹配干支历的时间',
 			cls: 'mod-cta'
 		});
 		filterButton.setCssProps({ marginTop: '20px', marginBottom: '10px' });
@@ -1410,6 +1461,109 @@ class TimeSettingModal extends Modal {
 			borderRadius: '5px',
 			maxHeight: '300px',
 			overflowY: 'auto'
+		});
+
+		// 筛选按钮点击事件
+		filterButton.addEventListener('click', () => {
+			// 获取用户选择的四柱干支
+			const selectedYearGan = yearGanSelect.value;
+			const selectedYearZhi = yearZhiSelect.value;
+			const selectedMonthGan = monthGanSelect.value;
+			const selectedMonthZhi = monthZhiSelect.value;
+			const selectedDayGan = dayGanSelect.value;
+			const selectedDayZhi = dayZhiSelect.value;
+			const selectedHourGan = hourGanSelect.value;
+			const selectedHourZhi = hourZhiSelect.value;
+			const isLateZi = selectedHourZhi === '晚子时';
+			const actualHourZhi = isLateZi ? '子' : selectedHourZhi;
+
+			// 清空结果区域
+			resultContainer.empty();
+			resultContainer.createEl('p', { text: '正在筛选...' });
+
+			// 使用setTimeout避免阻塞UI
+			setTimeout(() => {
+				try {
+					// 调用筛选方法
+					const results = this.view.paipan.filterBaziByFourPillars(
+						selectedYearGan, selectedYearZhi,
+						selectedMonthGan, selectedMonthZhi,
+						selectedDayGan, selectedDayZhi,
+						selectedHourGan, actualHourZhi,
+						isLateZi
+					);
+
+					// 清空结果区域
+					resultContainer.empty();
+
+					// 显示筛选结果
+					if (results.length === 0) {
+						resultContainer.createEl('p', { text: '未找到符合条件的日期' });
+					} else {
+						// 显示结果数量
+						resultContainer.createEl('p', {
+							text: `找到 ${results.length} 个符合条件的日期：`,
+							cls: 'result-count'
+						});
+
+						// 创建结果列表
+						const resultList = resultContainer.createEl('ul');
+						resultList.setCssProps({
+							listStyleType: 'none',
+							padding: '0',
+							margin: '0'
+						});
+
+						// 添加每个结果
+						results.forEach(result => {
+							const listItem = resultList.createEl('li');
+							listItem.setCssProps({
+								padding: '8px 0',
+								borderBottom: '1px solid #eee'
+							});
+
+							// 格式化日期时间为YYYY.MM.DD-HH.00
+							const formattedDate = `${String(result.year).padStart(4, '0')}.${String(result.month).padStart(2, '0')}.${String(result.day).padStart(2, '0')}-${String(result.hour).padStart(2, '0')}.00`;
+							listItem.setText(formattedDate);
+
+							// 添加点击事件，点击后仅存储选择的时间
+							listItem.addEventListener('click', () => {
+								// 存储选中的时间值
+								this.selectedYear = result.year;
+								this.selectedMonth = result.month;
+								this.selectedDay = result.day;
+								this.selectedHour = result.hour;
+								this.selectedMinute = 0;
+								this.selectedSecond = 0;
+
+								// 更新UI显示
+								const formattedDate = `${String(result.year).padStart(4, '0')}.${String(result.month).padStart(2, '0')}.${String(result.day).padStart(2, '0')}-${String(result.hour).padStart(2, '0')}.00`;
+								listItem.setText(`已选中: ${formattedDate}`);
+							});
+
+							// 添加悬停效果
+							listItem.setCssProps({
+								cursor: 'pointer',
+								transition: 'background-color 0.2s'
+							});
+
+							listItem.addEventListener('mouseenter', () => {
+								listItem.style.backgroundColor = '#f0f0f0';
+							});
+
+							listItem.addEventListener('mouseleave', () => {
+								listItem.style.backgroundColor = '';
+							});
+						});
+					}
+				} catch (error) {
+					resultContainer.empty();
+					resultContainer.createEl('p', {
+						text: `筛选出错: ${(error as Error).message}`,
+						cls: 'error-message'
+					});
+				}
+			}, 100);
 		});
 	}
 }

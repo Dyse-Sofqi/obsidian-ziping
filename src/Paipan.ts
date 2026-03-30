@@ -302,9 +302,82 @@ export class Paipan {
         return { gan: gan || '甲', zhi: zhi || '子' };
     }
 
+    // 判断天干的阴阳属性 (阳干返回true，阴干返回false)
+    isYangGan(gan: string): boolean {
+        const yangGan = ['甲', '丙', '戊', '庚', '壬'];
+        return yangGan.includes(gan);
+    }
+
+    // 计算小运 - 以时柱干支为基点，阳年出生的男性、阴年出生的女性顺排，阴年出生的男性、阳年出生的女性逆排
+    getXiaoYun(hourGan: string, hourZhi: string, birthYear: number, gender: number, age: number): { gan: string; zhi: string } {
+        // 获取出生年的年干
+        const birthYearGan = this.getYearGanZhi(birthYear).gan;
+        
+        // 判断出生年的阴阳属性
+        const isYangYear = this.isYangGan(birthYearGan);
+        
+        // 确定排列方向
+        const isMale = gender === 0; // 0=男，1=女
+        const isForward = (isYangYear && isMale) || (!isYangYear && !isMale);
+        
+        // 获取时柱干支在干支表中的索引
+        const ganIndex = this.engine.ctg.indexOf(hourGan);
+        const zhiIndex = this.engine.cdz.indexOf(hourZhi);
+        
+        if (ganIndex === -1 || zhiIndex === -1) {
+            return { gan: '', zhi: '' };
+        }
+        
+        // 计算步数（第一步是下一步）
+        const step = age + 1;
+        
+        // 计算新索引（60年一个完整周期）
+        const newGanIndex = isForward 
+            ? (ganIndex + step) % 10
+            : (ganIndex - step + 1000) % 10; // +1000确保足够大的正数
+        
+        const newZhiIndex = isForward
+            ? (zhiIndex + step) % 12
+            : (zhiIndex - step + 1200) % 12; // +1200确保足够大的正数
+        
+        // 返回小运干支
+        return {
+            gan: this.engine.ctg[newGanIndex] ?? '',
+            zhi: this.engine.cdz[newZhiIndex] ?? ''
+        };
+    }
+    
+    /**
+     * 计算大运期间所有年份对应的小运
+     * @param hourGan 时柱天干
+     * @param hourZhi 时柱地支
+     * @param birthYear 出生年份
+     * @param gender 性别 (0=男,1=女)
+     * @param startAge 大运起始年龄
+     * @param endAge 大运结束年龄
+     * @returns 返回年份到小运的映射
+     */
+    getXiaoYunForDayun(
+        hourGan: string, 
+        hourZhi: string, 
+        birthYear: number, 
+        gender: number, 
+        startAge: number, 
+        endAge: number
+    ): Record<number, { gan: string; zhi: string }> {
+        const result: Record<number, { gan: string; zhi: string }> = {};
+        
+        for (let age = startAge; age <= endAge; age++) {
+            const year = birthYear + age;
+            result[year] = this.getXiaoYun(hourGan, hourZhi, birthYear, gender, age);
+        }
+        
+        return result;
+    }
+
     // 计算小运 - 男顺女逆
     // 根据出生年份的干支，男命每年顺推，女命每年逆推
-    getXiaoYun(birthYear: number, gender: number, age: number): { gan: string; zhi: string; year: number; age: number } {
+    getXiaoYunOld(birthYear: number, gender: number, age: number): { gan: string; zhi: string; year: number; age: number } {
         // 出生年的年干支索引
         const birthGanIndex = (birthYear - 4) % 10;
         const birthZhiIndex = (birthYear - 4) % 12;
@@ -567,5 +640,101 @@ export class Paipan {
             辰: '土', 戌: '土', 丑: '土', 未: '土'
         };
         return map[zhi] || '';
+    }
+
+    // 根据年柱干支筛选年份
+    filterYearsByGanZhi(yearGan: string, yearZhi: string, startYear: number = 1900, endYear: number = 2060): number[] {
+        const result: number[] = [];
+        for (let year = startYear; year <= endYear; year++) {
+            const yearGanZhi = this.getYearGanZhi(year);
+            if (yearGanZhi.gan === yearGan && yearGanZhi.zhi === yearZhi) {
+                result.push(year);
+            }
+        }
+        return result;
+    }
+
+    // 根据日柱干支筛选年份中的日期
+    filterDatesByDayGanZhi(years: number[], dayGan: string, dayZhi: string): { year: number; month: number; day: number }[] {
+        const result: { year: number; month: number; day: number }[] = [];
+        
+        for (const year of years) {
+            // 遍历该年的每一天
+            const startDate = new Date(year, 0, 1);
+            const endDate = new Date(year, 11, 31);
+            
+            for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
+                const bazi = this.fatemaps(0, year, date.getMonth() + 1, date.getDate(), 12, 0, 0);
+                if (bazi.gztg[2] === dayGan && bazi.dz[2] === dayZhi) {
+                    result.push({
+                        year: year,
+                        month: date.getMonth() + 1,
+                        day: date.getDate()
+                    });
+                }
+            }
+        }
+        
+        return result;
+    }
+
+    // 根据时柱地支获取时辰开始时间
+    getHourStartByZhi(hourZhi: string, isLateZi: boolean = false): number {
+        // 地支顺序：子丑寅卯辰巳午未申酉戌亥
+        const zhiOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+        const zhiIndex = zhiOrder.indexOf(hourZhi);
+        
+        if (zhiIndex === -1) return 0;
+        
+        // 晚子时（23:00-24:00）返回23
+        if (hourZhi === '子' && isLateZi) return 23;
+        
+        // 正常情况下，子时从23:00开始，但早子时从0:00开始
+        // 这里我们默认返回早子时（0:00）
+        if (hourZhi === '子') return 0;
+        
+        // 其他时辰：丑时1:00，寅时3:00，...
+        return zhiIndex * 2;
+    }
+
+    // 筛选符合四柱干支的时间
+    filterBaziByFourPillars(
+        yearGan: string, yearZhi: string,
+        monthGan: string, monthZhi: string,
+        dayGan: string, dayZhi: string,
+        hourGan: string, hourZhi: string,
+        isLateZi: boolean = false
+    ): { year: number; month: number; day: number; hour: number }[] {
+        // 第一步：根据年柱干支筛选年份
+        const matchingYears = this.filterYearsByGanZhi(yearGan, yearZhi);
+        
+        // 第二步：根据日柱干支筛选日期
+        const matchingDates = this.filterDatesByDayGanZhi(matchingYears, dayGan, dayZhi);
+        
+        // 第三步：根据时柱地支和月柱干支筛选时间
+        const result: { year: number; month: number; day: number; hour: number }[] = [];
+        
+        for (const date of matchingDates) {
+            // 获取时辰开始时间
+            const hourStart = this.getHourStartByZhi(hourZhi, isLateZi);
+            
+            // 计算该日的四柱干支
+            const bazi = this.fatemaps(0, date.year, date.month, date.day, hourStart, 0, 0);
+            
+            // 检查月柱干支是否匹配
+            if (bazi.gztg[1] === monthGan && bazi.dz[1] === monthZhi) {
+                // 检查时柱干支是否匹配
+                if (bazi.gztg[3] === hourGan && bazi.dz[3] === hourZhi) {
+                    result.push({
+                        year: date.year,
+                        month: date.month,
+                        day: date.day,
+                        hour: hourStart
+                    });
+                }
+            }
+        }
+        
+        return result;
     }
 }
