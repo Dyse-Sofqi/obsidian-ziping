@@ -17,10 +17,15 @@ export default class ZipingPlugin extends Plugin {
 		// 添加打开侧边栏视图的命令
 		this.addCommand({
 			id: 'open-paipan-view',
-			name: '打开八字排盘',
+			name: '打开子平排盘',
 			callback: () => {
 				this.activateView();
 			}
+		});
+
+		// 添加侧边栏排盘图标
+		this.addRibbonIcon('calendar', '子平排盘', () => {
+			this.activateView();
 		});
 
 		// 添加设置标签页

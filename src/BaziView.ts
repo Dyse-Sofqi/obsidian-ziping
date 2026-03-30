@@ -40,7 +40,7 @@ export class BaziView extends ItemView {
 	}
 
 	getDisplayText() {
-		return "八字排盘";
+		return "子平排盘";
 	}
 
 	getIcon() {
@@ -105,7 +105,7 @@ export class BaziView extends ItemView {
 		resultContainer.setCssProps({
 			marginTop: '0px',
 			padding: '5px',
-			border: '1px solid #ccc',
+			border: '0px solid #ccc',
 			minHeight: '200px',
 			maxHeight: '400px',
 			overflow: 'auto',
@@ -185,7 +185,7 @@ export class BaziView extends ItemView {
 		if (data.bazi.zty) {
 			const zty = data.bazi.zty;
 			const cityName = this.plugin.settings.city || '';
-			timeText += ` | 真太阳时 (${cityName}): ${String(zty.hour).padStart(2, '0')}:${String(zty.minute).padStart(2, '0')}:${String(zty.second).padStart(2, '0')}`;
+			timeText += ` | 真太阳时：${String(zty.hour).padStart(2, '0')}:${String(zty.minute).padStart(2, '0')}:${String(zty.second).padStart(2, '0')}`;
 		}
 		timeDiv.createEl('p', { text: timeText });
 

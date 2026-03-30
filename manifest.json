@@ -1,9 +1,9 @@
 {
 	"id": "obsidian-Ziping",
-	"name": "Paipan Calendar",
+	"name": "子平排盘",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "农历公历干支历互转,万年历,四柱,六十甲子,属相,十二星座,二十四节气,八字排盘插件",
+	"description": "子平八字排盘插件",
 	"author": "hkargc",
 	"authorUrl": "https://github.com/hkargc/paipan",
 	"fundingUrl": "https://obsidian.md/pricing",
@@ -11,7 +11,7 @@
 	"views": {
 		"paipan-view": {
 			"type": "sidebar",
-			"name": "八字排盘",
+			"name": "子平排盘",
 			"icon": "calendar"
 		}
 	}
