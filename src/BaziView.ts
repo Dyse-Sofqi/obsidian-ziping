@@ -2,6 +2,7 @@ import { ItemView, WorkspaceLeaf, Modal, Notice, App } from 'obsidian';
 import { Paipan, BaziResult, CurrentDayunData, NearbySolarTerms, DayunItem } from './Paipan';
 import { CITIES, PROVINCE_CITY_GROUPS } from './settings';
 import ZipingPlugin from './main';
+import { domToBlob } from 'modern-screenshot';
 
 interface CurrentBaziData {
 	year: number;
@@ -59,28 +60,34 @@ export class BaziView extends ItemView {
 	}
 
 	renderContent(container: HTMLElement) {
+		// 创建按钮行容器
+		const buttonRow = container.createDiv('button-row');
+		buttonRow.style.display = 'flex';
+		buttonRow.style.gap = '4px'; // 按钮间距
+		buttonRow.style.alignItems = 'center';
+
 		// 设置时间按钮
-		const setTimeBtn = container.createEl('button', { text: '设置时间' });
+		const setTimeBtn = buttonRow.createEl('button', { text: '设置时间' });
 		setTimeBtn.addEventListener('click', () => {
 			new TimeSettingModal(this.app, this).open();
 		});
-		
+
 		// 回到现在按钮
-		const currentTimeBtn = container.createEl('button', { text: '回到现在' });
-		currentTimeBtn.style.marginTop = '20px';
+		const currentTimeBtn = buttonRow.createEl('button', { text: '回到现在' });
 		currentTimeBtn.addEventListener('click', () => {
 			this.loadCurrentTime();
 		});
-		
+
 		// 保存按钮
-		const saveBtn = container.createEl('button', { text: '保存案例' });
-		saveBtn.style.marginTop = '20px';
+		const saveBtn = buttonRow.createEl('button', { text: '保存案例', cls: 'save-btn-btn' });
 		saveBtn.addEventListener('click', () => {
 			this.saveCase();
 		});
-		
-		// 结果显示区域
-		this.createResultArea(container);
+
+		//复制截图到剪切板
+		// 调用 createResultArea，传入 buttonRow 或直接获取 copyBtn 后添加
+		const copyBtn = this.createResultArea(container); // 修改 createResultArea 使其返回按钮
+		buttonRow.appendChild(copyBtn); // 将 copyBtn 添加到同一行
 	}
 
 
@@ -109,8 +116,43 @@ export class BaziView extends ItemView {
 			minHeight: '200px',
 			maxHeight: '400px',
 			overflow: 'auto',
-			width: 'fit-content'
+			width: 'fit-content',
+			position: 'relative'
 		});
+
+		// Add copy button
+		const copyBtn = container.createEl('button', { text: '复制截图', cls: 'copy-screenshot-btn' });
+		// copyBtn.setCssProps({ position: 'absolute', top: '10px', right: '10px', zIndex: '600' });
+
+		// 在你的截图按钮回调中
+		copyBtn.addEventListener('click', () => {
+			void (async () => {
+				try {
+					await document.fonts.ready;
+					const blob = await domToBlob(resultContainer, {
+						scale: window.devicePixelRatio * 2 || 2,
+						backgroundColor: null,
+						quality: 1,
+					});
+					if (blob) {
+						const item = new ClipboardItem({ 'image/png': blob });
+						await navigator.clipboard.write([item]);
+						new Notice('截图已复制到剪贴板');
+					}
+				} catch (error) {
+					let errorMessage = '未知错误';
+					if (error instanceof Error) {
+						errorMessage = error.message;
+					} else if (typeof error === 'string') {
+						errorMessage = error;
+					} else {
+						errorMessage = JSON.stringify(error);
+					}
+					new Notice('截图失败: ' + errorMessage);
+				}
+			})();
+		});
+		return copyBtn;
 	}
 
 	calculateAndDisplay(year: number, month: number, day: number, hour: number, minute: number, second: number, gender: number, name: string = '案例') {
@@ -181,7 +223,7 @@ export class BaziView extends ItemView {
 		const date = new Date(data.year, data.month - 1, data.day, data.hour, data.minute, data.second);
 
 		// 真太阳时与公历在同一行展示
-		let timeText = `公历: ${date.getFullYear()}年${data.month}月${data.day}日 ${String(data.hour).padStart(2, '0')}:${String(data.minute).padStart(2, '0')}:${String(data.second).padStart(2, '0')}`;
+		let timeText = `公历：${date.getFullYear()}年${data.month}月${data.day}日 ${String(data.hour).padStart(2, '0')}:${String(data.minute).padStart(2, '0')}:${String(data.second).padStart(2, '0')}`;
 		if (data.bazi.zty) {
 			const zty = data.bazi.zty;
 			const cityName = this.plugin.settings.city || '';
@@ -194,16 +236,17 @@ export class BaziView extends ItemView {
 		if (lunarDate) {
 			const lunarYearStr = lunarDate.isLeap ? `${lunarDate.year}年闰${lunarDate.monthName}` : `${lunarDate.year}年${lunarDate.monthName}`;
 			const lunarDayStr = this.paipan.getLunarDayName(lunarDate.day);
-			timeDiv.createEl('p', { text: `农历: ${lunarYearStr}${lunarDayStr}` });
+			timeDiv.createEl('p', { text: `农历：${lunarYearStr}${lunarDayStr}` });
 		} else {
-			timeDiv.createEl('p', { text: `农历: [计算失败]` });
+			timeDiv.createEl('p', { text: `农历：[计算失败]` });
 		}
 
 		// 干支历与时辰调整按钮在同一行
 		const gzhRow = timeDiv.createEl('div');
 		gzhRow.addClass('gzh-row');
 		const gzhSpan = gzhRow.createEl('span');
-		gzhSpan.appendText('干支历: ');
+		gzhSpan.appendText('干支历： ');
+		gzhSpan.addClass('gzh-text'); 
 
 		// 年柱
 		const yearGanSpan = gzhSpan.createEl('span');
@@ -293,22 +336,28 @@ export class BaziView extends ItemView {
 		// 干支四柱表格
 		this.createBaziTable(resultContainer, data);
 
-		// 大运信息
-		const dayunDiv = resultContainer.createEl('div');
-		dayunDiv.createEl('p', { text: `起运时间: ${data.dayun.startAge}岁` });
-
 		// 当前大运和流年 - 显示选中的大运或小运和流年
 		let displayText = '';
 		if (data.selectedDayunIndex === -1) {
 			// 小运模式
 			const xiaoyunYear = data.year + (data.selectedLiunianIndex ?? 0);
-			displayText = `当前小运 流年: ${xiaoyunYear}年`;
+			// 计算命主虚岁：流年年份 - 出生年份 + 1
+			const age = xiaoyunYear - data.year + 1;
+			displayText = `小运。流年：${xiaoyunYear}年，${age}岁`;
 		} else {
 			const selectedDayunForDisplay = data.dayun.allDayun[data.selectedDayunIndex ?? 0] || data.dayun.currentDayun;
 			const selectedLiunianIndex = data.selectedLiunianIndex ?? 0;
 			const selectedLiunianYear = selectedDayunForDisplay.startYear + selectedLiunianIndex;
-			displayText = `当前大运: ${selectedDayunForDisplay.age}岁 ${selectedDayunForDisplay.gz} 流年: ${selectedLiunianYear}年`;
+			// 计算命主虚岁：流年年份 - 出生年份 + 1
+			const age = selectedLiunianYear - data.year + 1;
+			// 提前计算流年干支
+			const liuNianGanZhi = this.paipan.getYearGanZhi(selectedLiunianYear);
+			displayText = `大运：${selectedDayunForDisplay.gz}。流年: ${selectedLiunianYear}年${liuNianGanZhi.gan}${liuNianGanZhi.zhi}，${age}岁`;
 		}
+
+		// 大运信息
+		const dayunDiv = resultContainer.createEl('div');
+		dayunDiv.createEl('p', { text: `起运时间：${data.dayun.startAge}岁。${data.dayun.qyy_desc2 ? ' ' + data.dayun.qyy_desc2 : ''}` });
 		dayunDiv.createEl('p', { text: displayText });
 
 		// 获取日柱天干用于计算十神
@@ -430,9 +479,8 @@ export class BaziView extends ItemView {
 				hourZhi,          // 时柱地支
 				data.year,        // 出生年
 				data.gender,      // 性别
-				i                 // 年龄
+				data.dayun.currentDayun.age + i  // 年龄 = 大运起始年龄 + 偏移量
 			);
-
 			const btn = liunianList.createEl('button', {
 				cls: (i === selectedLiunianIndex ? 'liunian-btn is-selected' : 'liunian-btn')
 			});
@@ -462,7 +510,6 @@ export class BaziView extends ItemView {
 			const xiaoYunRow = btn.createEl('div');
 			xiaoYunRow.setText(`${xiaoYun.gan}${xiaoYun.zhi}`);
 			xiaoYunRow.addClass('liunian-row');
-			xiaoYunRow.style.marginTop = '2px';
 
 			// 点击流年时选中该流年及其所属大运，小运模式下使用-1作为大运索引
 			btn.addEventListener('click', () => {
@@ -1104,10 +1151,12 @@ class TimeSettingModal extends Modal {
 
 		// 创建时间选择容器，所有下拉列表在同一行
 		const timeRow = container.createEl('div');
-		timeRow.setCssProps({ display: 'flex', gap: '0', alignItems: 'center', marginBottom: '15px' });
+		timeRow.setCssProps({ display: 'flex', gap: '0', alignItems: 'center', marginBottom: '20px' });
 
 		// 时间标签
-		timeRow.createEl('label', { text: '时间：' });
+		const timeLabel = timeRow.createEl('label', { text: '时间：' });
+		timeLabel.style.margin = '0';
+		timeLabel.style.padding = '0';
 
 		// 年
 		const yearSelect = timeRow.createEl('select');
@@ -1455,8 +1504,7 @@ class TimeSettingModal extends Modal {
 			cls: 'bazi-filter-result'
 		});
 		resultContainer.setCssProps({
-			marginTop: '10px',
-			padding: '10px',
+			marginTop: '5px',
 			border: '1px solid #ddd',
 			borderRadius: '5px',
 			maxHeight: '300px',
@@ -1500,11 +1548,11 @@ class TimeSettingModal extends Modal {
 					if (results.length === 0) {
 						resultContainer.createEl('p', { text: '未找到符合条件的日期' });
 					} else {
-						// 显示结果数量
-						resultContainer.createEl('p', {
-							text: `找到 ${results.length} 个符合条件的日期：`,
-							cls: 'result-count'
-						});
+						// // 显示结果数量
+						// resultContainer.createEl('p', {
+						// 	text: `找到 ${results.length} 个符合条件的日期：`,
+						// 	cls: 'result-count'
+						// });
 
 						// 创建结果列表
 						const resultList = resultContainer.createEl('ul');

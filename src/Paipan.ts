@@ -27,6 +27,7 @@ interface PaipanResult {
     dy?: DayunItemData[];
     zty?: number;
     pty?: number;
+    qyy_desc2?: string;
 }
 
 interface DayunItemData {
@@ -73,6 +74,7 @@ export interface CurrentDayunData {
     currentDayun: DayunItem;
     liunian: number;
     allDayun: DayunItem[];
+    qyy_desc2?: string;
 }
 
 export class Paipan {
@@ -205,12 +207,13 @@ export class Paipan {
             throw new Error('无法计算当前大运');
         }
 
-        return {
-            startAge: allDayun[0]?.age ?? 0,
-            currentDayun,
-            liunian: now.getFullYear(),
-            allDayun
-        };
+		return {
+				startAge: allDayun[0]?.age ?? 0 ,  // 虚岁: 出生第一年即1岁
+				currentDayun,
+				liunian: now.getFullYear(),
+				allDayun,
+				qyy_desc2: rt.qyy_desc2
+		};
     }
 
     getLunarDate(yy: number, mm: number, dd: number): { year: number; month: number; day: number; isLeap: boolean; monthName: string; yearGanZhi: string } | null {
