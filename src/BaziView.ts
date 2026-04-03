@@ -109,7 +109,7 @@ export class BaziView extends ItemView {
 		resultContainer.setCssProps({
 			marginTop: '0px',
 			padding: '5px',
-			border: '1px solid #ccc',
+			border: '0px solid #ccc',
 			minHeight: '200px',
 			maxHeight: '400px',
 			overflow: 'auto',
@@ -229,6 +229,7 @@ export class BaziView extends ItemView {
 
 		// 时间显示
 		const timeDiv = resultContainer.createEl('div');
+		timeDiv.addClass('bazi-time-info');
 		const date = new Date(data.year, data.month - 1, data.day, data.hour, data.minute, data.second);
 
 		// 真太阳时与公历在同一行展示
@@ -248,19 +249,6 @@ export class BaziView extends ItemView {
 			timeDiv.createEl('p', { text: `农历：${lunarYearStr}${lunarDayStr}` });
 		} else {
 			timeDiv.createEl('p', { text: `农历：[计算失败]` });
-		}
-
-		// 节气信息
-		if (data.solarTerms.previous && data.solarTerms.next) {
-			const solarDiv = resultContainer.createEl('div');
-			const formatDateTime = (date: Date) => {
-				const hours = date.getHours().toString().padStart(2, '0');
-				const minutes = date.getMinutes().toString().padStart(2, '0');
-				return `${date.getMonth() + 1}/${date.getDate()} ${hours}:${minutes}`;
-			};
-			solarDiv.createEl('p', {
-				text: `节气：${data.solarTerms.previous.name}${formatDateTime(data.solarTerms.previous.date)}-${data.solarTerms.next.name}${formatDateTime(data.solarTerms.next.date)}`
-			});
 		}
 
 		// 干支历与时辰调整按钮在同一行
@@ -311,6 +299,19 @@ export class BaziView extends ItemView {
 		hourMinusBtn.addClass('hour-adjust-btn');
 		const hourPlusBtn = gzhRow.createEl('button', { text: '时↓' });
 		hourPlusBtn.addClass('hour-adjust-btn');
+
+		// 节气信息
+		if (data.solarTerms.previous && data.solarTerms.next) {
+			// const solarDiv = resultContainer.createEl('div');
+			const formatDateTime = (date: Date) => {
+				const hours = date.getHours().toString().padStart(2, '0');
+				const minutes = date.getMinutes().toString().padStart(2, '0');
+				return `${date.getMonth() + 1}/${date.getDate()} ${hours}:${minutes}`;
+			};
+			timeDiv.createEl('p', {
+				text: `节气：${data.solarTerms.previous.name}${formatDateTime(data.solarTerms.previous.date)}-${data.solarTerms.next.name}${formatDateTime(data.solarTerms.next.date)}`
+			});
+		}
 
 		// 时间调整函数
 		const adjustTime = (hourDelta: number) => {
@@ -372,7 +373,8 @@ export class BaziView extends ItemView {
 
 		// 大运信息
 		const dayunDiv = resultContainer.createEl('div');
-		dayunDiv.createEl('p', { text: `起运时间：${data.dayun.startAge}岁。${data.dayun.qyy_desc2 ? ' ' + data.dayun.qyy_desc2 : ''}` });
+		dayunDiv.addClass('dayun-info');
+		dayunDiv.createEl('p', { text: `起运：${data.dayun.startAge}岁。${data.dayun.qyy_desc2 ? ' ' + data.dayun.qyy_desc2 : ''}` });
 		dayunDiv.createEl('p', { text: displayText });
 
 		// 获取日柱天干用于计算十神
@@ -549,6 +551,7 @@ export class BaziView extends ItemView {
 		}
 
 		const table = container.createEl('table');
+		table.addClass('bazi-table');
 		table.setCssProps({
 			width: '100%',
 			borderCollapse: 'collapse',
@@ -610,7 +613,7 @@ export class BaziView extends ItemView {
 			th.setText(title);
 			th.setCssProps({
 				border: '1px solid #ccc',
-				padding: '8px',
+				padding: '6px 8px',
 				backgroundColor: '#f5f5f5'
 			});
 		});
@@ -641,7 +644,7 @@ export class BaziView extends ItemView {
 		].forEach(text => {
 			const td = shishenRow.createEl('td');
 			td.setText(text);
-			td.setCssProps({ border: '1px solid #ccc', padding: '8px', textAlign: 'center' });
+			td.setCssProps({ border: '1px solid #ccc', padding: '6px 8px', textAlign: 'center' });
 		});
 
 		// 后续数据行
@@ -676,10 +679,10 @@ export class BaziView extends ItemView {
 			const row = table.createEl('tr');
 			const first = row.createEl('td');
 			first.setText(rowData.label);
-			first.setCssProps({ padding: '8px', fontWeight: 'bold', textAlign: 'center' });
+			first.setCssProps({ padding: '6px 8px', fontWeight: 'bold', textAlign: 'center' });
 			rowData.values.forEach((val, idx) => {
 				const td = row.createEl('td');
-				td.setCssProps({ padding: '8px', textAlign: 'center' });
+				td.setCssProps({ padding: '6px 8px', textAlign: 'center' });
 
 				if (rowData.isCangQi) {
 					// 主气、中气、余气：天干有颜色，十神无颜色
@@ -840,6 +843,11 @@ class TimeSettingModal extends Modal {
 
 		// 选项卡
 		const tabContainer = contentEl.createEl('div');
+		tabContainer.setCssProps({
+			display: 'flex', 
+			gap: '0px', 
+			margin: '6px 0px 3px 0px'
+		});
 		const tabs = ['公历', '农历', '干支'];
 		let activeTab = 0;
 
@@ -849,6 +857,10 @@ class TimeSettingModal extends Modal {
 		tabs.forEach((tab, index) => {
 			const btn = tabButtons.createEl('button', { text: tab });
 			tabButtonElements.push(btn);
+			// 设置按钮基础样式
+			btn.style.borderRadius = '0px';
+			btn.style.boxShadow = 'none';
+			btn.style.backgroundColor = '#f1f1f1';
 			btn.addEventListener('click', () => {
 				activeTab = index;
 				// 更新所有按钮的样式
@@ -857,13 +869,11 @@ class TimeSettingModal extends Modal {
 						button.setCssProps({
 							backgroundColor: 'var(--background-secondary)',
 							color: 'var(--interactive-accent)',
-							border: 'none'
 						});
 					} else {
 						button.setCssProps({
 							backgroundColor: '#f1f1f1',
 							color: 'black',
-							border: '1px solid #ccc'
 						});
 					}
 				});
@@ -875,7 +885,6 @@ class TimeSettingModal extends Modal {
 			tabButtonElements[0].setCssProps({
 				backgroundColor: 'var(--background-secondary)',
 				color: 'var(--interactive-accent)',
-				border: 'none'
 			});
 		}
 
@@ -891,11 +900,16 @@ class TimeSettingModal extends Modal {
 		tabContent.addClass('tab-content');
 
 		// 姓名和性别在同一行
+		// 正确设置容器为 flex 并垂直居中
 		const nameGenderRow = tabContent.createEl('div');
-		nameGenderRow.setCssProps({ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '15px' });
+		nameGenderRow.style.display = 'flex';
+		nameGenderRow.style.gap = '20px';
+		nameGenderRow.style.alignItems = 'center';   // 关键：容器控制子元素垂直居中
+		nameGenderRow.style.margin = '3px 0px 3px 0px';
 
 		// 姓名输入
 		const nameLabel = nameGenderRow.createEl('label', { text: '姓名: ' });
+		// 不需要对 label 设置 alignItems
 
 		// 生成排盘码作为默认值
 		const currentData = this.view.currentData;
@@ -928,7 +942,10 @@ class TimeSettingModal extends Modal {
 		// 性别选择
 		const genderLabel = nameGenderRow.createEl('label', { text: '性别: ' });
 		const genderContainer = nameGenderRow.createEl('div');
-		genderContainer.setCssProps({ display: 'flex', gap: '10px' });
+		genderContainer.style.display = 'flex';
+		genderContainer.style.gap = '0px';
+		genderContainer.style.alignItems = 'center';   // 关键：容器控制子元素垂直居中
+		genderContainer.style.margin = '3px 0px 3px 0px';
 
 		// 男单选按钮
 		const maleRadio = genderContainer.createEl('input', {
@@ -938,7 +955,7 @@ class TimeSettingModal extends Modal {
 		maleRadio.setAttribute('name', 'gender');
 		maleRadio.checked = true;
 		const maleLabel = genderContainer.createEl('label', { text: '男' });
-		maleLabel.setCssProps({ marginLeft: '5px' });
+		maleLabel.style.marginRight = '10px';
 
 		// 女单选按钮
 		const femaleRadio = genderContainer.createEl('input', {
@@ -959,8 +976,11 @@ class TimeSettingModal extends Modal {
 
 		// 城市选择 - 两级联动
 		const cityContainer = tabContent.createEl('div');
-		cityContainer.setCssProps({ marginTop: '10px', display: 'flex', gap: '10px', alignItems: 'center' });
-
+		cityContainer.style.display = 'flex';
+		cityContainer.style.gap = '0px';
+		cityContainer.style.alignItems = 'center';   // 关键：容器控制子元素垂直居中
+		cityContainer.style.margin = '3px 0px 3px 0px';
+		
 		// 省份选择
 		const provinceLabel = cityContainer.createEl('span');
 		provinceLabel.setText('省份: ');
@@ -1122,7 +1142,10 @@ class TimeSettingModal extends Modal {
 
 		// 创建时间选择容器，所有下拉列表在同一行
 		const timeRow = container.createEl('div');
-		timeRow.setCssProps({ display: 'flex', gap: '0', alignItems: 'center', marginBottom: '15px' });
+		timeRow.style.display = 'flex';
+		timeRow.style.gap = '0px';
+		timeRow.style.alignItems = 'center';   // 关键：容器控制子元素垂直居中
+		timeRow.style.margin = '3px 0px 3px 0px';
 
 		// 时间标签
 		timeRow.createEl('label', { text: '时间：' });
@@ -1194,7 +1217,10 @@ class TimeSettingModal extends Modal {
 
 		// 创建时间选择容器，所有下拉列表在同一行
 		const timeRow = container.createEl('div');
-		timeRow.setCssProps({ display: 'flex', gap: '0', alignItems: 'center', marginBottom: '20px' });
+		timeRow.style.display = 'flex';
+		timeRow.style.gap = '0px';
+		timeRow.style.alignItems = 'center';   // 关键：容器控制子元素垂直居中
+		timeRow.style.margin = '3px 0px 3px 0px';
 
 		// 时间标签
 		const timeLabel = timeRow.createEl('label', { text: '时间：' });

@@ -1,6 +1,7 @@
 import {App, Notice, Plugin, WorkspaceLeaf} from 'obsidian';
 import {DEFAULT_SETTINGS, ZipingSettings, ZipingSettingTab} from "./settings";
 import { BaziView, PAIPAN_VIEW_TYPE } from './BaziView';
+import { Paipan } from './Paipan';
 
 // 导入排盘引擎以初始化 window.p
 require('./paipan.js');
@@ -17,7 +18,7 @@ export default class ZipingPlugin extends Plugin {
 		// 添加打开侧边栏视图的命令
 		this.addCommand({
 			id: 'open-paipan-view',
-			name: '打开子平排盘',
+			name: '打开排盘',
 			callback: () => {
 				this.activateView();
 			}
@@ -116,7 +117,7 @@ export default class ZipingPlugin extends Plugin {
 		lines.push('---');
 		lines.push(`title: "${title || '案例'}"`);
 		lines.push(`author: ""`);
-		lines.push('tags: [八字,命例]');
+		lines.push('tags: [八字/命例]');
 		lines.push(`created: ${formatDateTime(now)}`);
 		lines.push(`modified: ${formatDateTime(now)}`);
 		lines.push(`aliases: []`);
@@ -127,12 +128,23 @@ export default class ZipingPlugin extends Plugin {
 		const genderCode = data.gender === 0 ? 'Y' : 'X';
 		const paiPanCode = `${String(data.year)}.${String(data.month).padStart(2, '0')}.${String(data.day).padStart(2, '0')}-${String(data.hour).padStart(2, '0')}.${String(data.minute).padStart(2, '0')}-${genderCode}`;
 		lines.push(`#### ${paiPanCode}，${data.name || '案例'}`);
+		lines.push('');
 
-		// 5. 第四行展示十神简写
+		// 3. 使用Paipan类获取十神，确保与BaziView.ts中显示一致
+		const paipan = new Paipan();
 		const riZhuGan = data.bazi.gztg[2];
-		const nianGanShiShen = this.getShiShenShort(riZhuGan, data.bazi.gztg[0]);
-		const yueGanShiShen = this.getShiShenShort(riZhuGan, data.bazi.gztg[1]);
-		const shiGanShiShen = this.getShiShenShort(riZhuGan, data.bazi.gztg[3]);
+		
+		// 获取完整十神名称
+		const nianGanShiShenFull = paipan.getShiShenFull(riZhuGan, data.bazi.gztg[0]);
+		const yueGanShiShenFull = paipan.getShiShenFull(riZhuGan, data.bazi.gztg[1]);
+		const shiGanShiShenFull = paipan.getShiShenFull(riZhuGan, data.bazi.gztg[3]);
+		
+		// 转换为简写
+		const nianGanShiShen = this.getShiShenShortFromFull(nianGanShiShenFull);
+		const yueGanShiShen = this.getShiShenShortFromFull(yueGanShiShenFull);
+		const shiGanShiShen = this.getShiShenShortFromFull(shiGanShiShenFull);
+		
+		// 5. 第四行展示十神简写
 		lines.push(`${nianGanShiShen}${yueGanShiShen}〇${shiGanShiShen}`);
 
 		// 6. 第五行展示天干
@@ -142,34 +154,35 @@ export default class ZipingPlugin extends Plugin {
 		lines.push(`${data.bazi.dz[0]}${data.bazi.dz[1]}${data.bazi.dz[2]}${data.bazi.dz[3]}`);
 
 		// 8. 第七行展示九部大运干支
-		const dayunGanZhi = data.dayun.allDayun.slice(0, 9).map((dy: any) => `${dy.gan}${dy.zhi}`).join('、');
-		lines.push(`大运：${dayunGanZhi}`);
+		const dayunItems = data.dayun.allDayun.slice(0, 9) as any[];
+		// const dayunGanZhi = dayunItems.map((dy) => `${dy.gan}${dy.zhi}`).join('、');
+		// lines.push(`大运：${dayunGanZhi}`);
+
+		lines.push('');
+		// 9. 生成大运列表，每行展示一个大运的起始年份和干支和岁数
+		for (const dayun of dayunItems) {
+			lines.push(`- ${dayun.startYear}年${dayun.gan}${dayun.zhi}-${dayun.age}岁`);
+		}
+		lines.push('');
 
 		return lines.join('\n');
 	}
 
-	// 获取十神简写
-	private getShiShenShort(riGan: string, gan: string): string {
+	// 从完整十神名称获取简写
+	private getShiShenShortFromFull(shiShenFull: string): string {
 		const shiShenMap: Record<string, string> = {
 			'比肩': '比', '劫财': '劫', '食神': '食', '伤官': '伤',
-			'偏财': '才', '正财': '财', '七杀': '杀', '正官': '官',
+			'偏财': '才', '正财': '财', '七杀': '杀', '偏官': '杀', '正官': '官',
 			'偏印': '枭', '正印': '印'
 		};
 
-		// 获取完整十神名称
-		const wuXing = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
-		const wuXingIndex = wuXing.indexOf(riGan);
-		const ganIndex = wuXing.indexOf(gan);
-
-		if (wuXingIndex === -1 || ganIndex === -1) return '';
-
-		// 计算十神关系
-		const diff = (ganIndex - wuXingIndex + 10) % 10;
-		const shiShenFullArray = ['比肩', '劫财', '食神', '伤官', '偏财', '正财', '七杀', '正官', '偏印', '正印'];
-		const shiShenFull = shiShenFullArray[diff];
-
-		if (!shiShenFull) return '';
-
 		return shiShenMap[shiShenFull] || '';
+	}
+
+	// 获取十神简写（保持向后兼容性，但建议使用getShiShenShortFromFull）
+	private getShiShenShort(riGan: string, gan: string): string {
+		const paipan = new Paipan();
+		const shiShenFull = paipan.getShiShenFull(riGan, gan);
+		return this.getShiShenShortFromFull(shiShenFull);
 	}
 }

@@ -4,11 +4,6 @@
     align-items: center;
 }
 
-/* 八字排盘段落样式 */
-#bazi-result p {
-    line-height: 0.7;
-}
-
 /* 八字排盘表格样式 */
 #bazi-result table {
     width: min-content !important;
@@ -22,7 +17,6 @@
     flex-direction: column;
     gap: 1px;
     margin-top: 5px;
-    line-height: 0.7;
     padding: 0px 20px;
     border: transparent solid 1px !important;
 }
@@ -34,11 +28,25 @@
     border-radius: 4px;
 }
 
+.bazi-time-info p {
+    margin: 5px 0;
+    margin-top: 1px;
+}
+
+/* 八字排盘按钮 */
+.bazi-btn {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    background-color: #f5f5f5;
+}
+
 /* 干支历按钮行 */
 .gzh-row {
     display: flex;
     flex-wrap: nowrap;
     align-items: center;
+    margin-top: 0px;
     gap: 4px;
 }
 
@@ -54,12 +62,15 @@
     margin-top: 5px;
 }
 
+.dayun-info P{
+    margin: 6px 0;
+}
 /* 大运列表容器 - 水平一行展示 */
 .dayun-list {
     display: flex;
     flex-wrap: nowrap;
     gap: 0;
-    margin-bottom: 10px;
+    margin-bottom: 6px;
     width: 100%;
 }
 
@@ -136,7 +147,7 @@
     display: flex;
     flex-wrap: nowrap;
     gap: 0;
-    margin-bottom: 10px;
+    margin-bottom: 1px;
     width: 100%;
     overflow-x: auto;
 }
@@ -225,6 +236,13 @@
     justify-content: center;
 }
 
+#bazi-result .bazi-table tr:nth-child(3) td,
+#bazi-result .bazi-table th:nth-child(3) td,
+#bazi-result .bazi-table tr:nth-child(4) td,
+#bazi-result .bazi-table th:nth-child(4) td {
+    padding: 8px 8px !important;
+}
+
 #bazi-result th,
 #bazi-result td {
     border: none !important;
@@ -240,14 +258,9 @@
     border-bottom: 1px solid #ccc !important;
 }
 
-/* 表头第一列加右边框 */
-#bazi-result thead tr th:first-child {
-    border-right: 1px solid #ccc !important;
-}
-
 /* 时柱与大运列之间的框线（第5列和第6列之间，时柱是第5列，大运是第6列） */
 #bazi-result tr td:nth-child(6),
-#bazi-result tr th:nth-child(6) {
+#bazi-result tr:nth-child(3) th:nth-child(6) {
     border-left: 1px solid #ccc !important;
 }
 
