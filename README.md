@@ -1,90 +1,112 @@
-# Obsidian Sample Plugin
+# 子平排盘插件
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+**子平排盘**是一款专为Obsidian设计的专业八字排盘工具插件，集成了传统子平八字命理学算法，让您在笔记环境中快速生成和分析八字信息。
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## 🌟 核心功能
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+### 🔢 **智能八字排盘**
 
-## First time developing plugins?
+- **自动生辰排盘**：根据出生年月日时自动计算八字四柱
+- **真太阳时校准**：内置城市经纬度数据，自动计算真太阳时
+- **多种排盘选项**：支持公历/农历日期输入，精确到分钟
 
-Quick starting guide for new plugin devs:
+### 📊 **命理信息分析**
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+- **十神关系**：自动分析年、月、日、时柱的十神关系
+- **大运排算**：计算并显示八字大运走势
+- **流年分析**：查看特定年份的运势变化
 
-## Releasing new releases
+### 💾 **智能保存管理**
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+- **一键保存案例**：将排盘结果保存为Markdown文件
+- **结构化存储**：自动生成标准的YAML frontmatter格式
+- **分类管理**：支持自定义案例保存路径和标签系统
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+### 🎛️ **用户友好界面**
 
-## Adding your plugin to the community plugin list
+- **侧边栏视图**：集成到Obsidian右侧边栏，随时调用
+- **快捷命令**：支持命令面板和功能区图标快速启动
+- **自定义设置**：可配置经纬度、城市选择等参数
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+### 🌍 **地理数据支持**
 
-## How to use
+- **400+城市覆盖**：内置全国主要城市经纬度数据库
+- **两级联动选择**：省份-城市智能选择系统
+- **自动定位**：选择城市时自动更新经纬度设置
 
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
+## 💡 技术特色
 
-## Manually installing the plugin
+- **实时计算**：基于精确的农历算法和天文计算
+- **离线运行**：所有计算本地完成，无需网络连接
+- **数据安全**：排盘资料完全存储在本地笔记中
 
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
+## 📈 应用场景
 
-## Improve code quality with eslint
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
+- **命理学研究**：专业命理师的分析工具
+- **个人记录**：记录重要生辰八字信息
+- **学习辅助**：八字命理学习者的练习平台
+- **案例存档**：建立个人命理案例数据库
 
-## Funding URL
+## 🔧 安装使用
 
-You can include funding URLs where people who use your plugin can financially support it.
+### 安装方法
 
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
+1. 在Obsidian中打开**Settings → Community plugins**
+2. 禁用安全模式
+3. 点击**Browse**搜索"子平排盘"
+4. 点击安装并启用插件
 
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+### 快速开始
+
+1. 点击左侧功能区"日历"图标打开排盘界面
+2. 或在命令面板中搜索"打开子平排盘"
+3. 输入出生信息，点击排盘即可查看结果
+4. 点击保存可将结果存入指定文件夹
+
+## ⚙️ 配置说明
+
+### 基本设置
+
+- **城市选择**：选择您所在的地区以计算真太阳时
+- **案例路径**：自定义案例保存的文件夹路径（默认：命例）
+- **经纬度**：手动设置地理位置坐标
+
+## 📝 输出格式示例
+
+保存的案例文件将包含：
+
+```markdown
+---
+title: "张三的八字案例"
+author: ""
+tags: [八字,命例]
+created: 2026-04-02T10:30:00
+modified: 2026-04-02T10:30:00
+aliases: []
+---
+
+#### 1990.01.15-08.30-Y，张三
+劫劫〇印
+庚庚〇壬
+戌子〇辰
+大运：辛巳、壬午、癸未、甲申、乙酉、丙戌、丁亥、戊子
 ```
 
-If you have multiple URLs, you can also do:
+## 🔄 版本信息
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
+- **当前版本**：v1.0.3
+- **最低Obsidian版本**：0.15.0
+- **兼容性**：Windows、macOS、Linux、移动端
 
-## API Documentation
+## 🤝 支持与反馈
 
-See https://docs.obsidian.md
+如有问题或建议，欢迎通过以下方式联系：
+
+- GitHub Issues: [项目地址](https://github.com/hkargc/paipan)
+- 邮箱反馈：请访问GitHub页面获取联系方式
+
+## 📄 许可证
+
+本项目采用开源许可证，详情请查看LICENSE文件。
+
+---

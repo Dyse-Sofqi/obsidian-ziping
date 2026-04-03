@@ -123,15 +123,20 @@ export class BaziView extends ItemView {
 		// Add copy button
 		const copyBtn = container.createEl('button', { text: '复制截图', cls: 'copy-screenshot-btn' });
 		// copyBtn.setCssProps({ position: 'absolute', top: '10px', right: '10px', zIndex: '600' });
-
+		
 		// 在你的截图按钮回调中
 		copyBtn.addEventListener('click', () => {
 			void (async () => {
 				try {
 					await document.fonts.ready;
+					// 获取第二背景色（假设是 Obsidian 的 --background-secondary）
+					const bgColor = getComputedStyle(document.documentElement)
+						.getPropertyValue('--background-secondary')
+						.trim();
 					const blob = await domToBlob(resultContainer, {
 						scale: window.devicePixelRatio * 2 || 2,
-						backgroundColor: null,
+						backgroundColor: bgColor, // 修改此处
+						// backgroundColor: null,
 						quality: 1,
 					});
 					if (blob) {

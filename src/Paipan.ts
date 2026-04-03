@@ -223,7 +223,16 @@ export class Paipan {
                 return null;
             }
 
-            const [year, month, day, isLeap, extra] = result;
+            const year = Number(result[0]);
+            const month = Number(result[1]);
+            const day = Number(result[2]);
+            const isLeap = Boolean(result[3]);
+            const extra = result[4] as { ym?: string; gz?: string } | undefined;
+
+            if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+                return null;
+            }
+
             return {
                 year,
                 month,
@@ -247,7 +256,14 @@ export class Paipan {
                 return null;
             }
 
-            const [year, month, day] = result;
+            const year = Number(result[0]);
+            const month = Number(result[1]);
+            const day = Number(result[2]);
+
+            if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+                return null;
+            }
+
             return {
                 year,
                 month,
