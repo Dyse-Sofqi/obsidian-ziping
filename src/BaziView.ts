@@ -129,14 +129,21 @@ export class BaziView extends ItemView {
 			void (async () => {
 				try {
 					await document.fonts.ready;
-					// 获取第二背景色（假设是 Obsidian 的 --background-secondary）
-					const bgColor = getComputedStyle(document.documentElement)
+					// 获取背景色：优先从 CSS 变量获取，若为空则从 body 获取计算后的背景色
+					let bgColor = getComputedStyle(document.documentElement)
 						.getPropertyValue('--background-secondary')
 						.trim();
+					// 如果 CSS 变量为空，尝试从 body 获取背景色
+					if (!bgColor) {
+						bgColor = getComputedStyle(document.body).backgroundColor;
+					}
+					// 如果仍然为空，使用默认浅灰色
+					if (!bgColor) {
+						bgColor = '#f5f5f5';
+					}
 					const blob = await domToBlob(resultContainer, {
 						scale: window.devicePixelRatio * 2 || 2,
-						backgroundColor: bgColor, // 修改此处
-						// backgroundColor: null,
+						backgroundColor: bgColor,
 						quality: 1,
 					});
 					if (blob) {
