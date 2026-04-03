@@ -61,10 +61,7 @@ export class BaziView extends ItemView {
 
 	renderContent(container: HTMLElement) {
 		// 创建按钮行容器
-		const buttonRow = container.createDiv('button-row');
-		buttonRow.style.display = 'flex';
-		buttonRow.style.gap = '4px'; // 按钮间距
-		buttonRow.style.alignItems = 'center';
+		const buttonRow = container.createDiv('button-row-ziping');
 
 		// 设置时间按钮
 		const setTimeBtn = buttonRow.createEl('button', { text: '设置时间' });
@@ -112,7 +109,7 @@ export class BaziView extends ItemView {
 		resultContainer.setCssProps({
 			marginTop: '0px',
 			padding: '5px',
-			border: '0px solid #ccc',
+			border: '1px solid #ccc',
 			minHeight: '200px',
 			maxHeight: '400px',
 			overflow: 'auto',
@@ -123,7 +120,7 @@ export class BaziView extends ItemView {
 		// Add copy button
 		const copyBtn = container.createEl('button', { text: '复制截图', cls: 'copy-screenshot-btn' });
 		// copyBtn.setCssProps({ position: 'absolute', top: '10px', right: '10px', zIndex: '600' });
-		
+
 		// 在你的截图按钮回调中
 		copyBtn.addEventListener('click', () => {
 			void (async () => {
@@ -253,12 +250,25 @@ export class BaziView extends ItemView {
 			timeDiv.createEl('p', { text: `农历：[计算失败]` });
 		}
 
+		// 节气信息
+		if (data.solarTerms.previous && data.solarTerms.next) {
+			const solarDiv = resultContainer.createEl('div');
+			const formatDateTime = (date: Date) => {
+				const hours = date.getHours().toString().padStart(2, '0');
+				const minutes = date.getMinutes().toString().padStart(2, '0');
+				return `${date.getMonth() + 1}/${date.getDate()} ${hours}:${minutes}`;
+			};
+			solarDiv.createEl('p', {
+				text: `节气：${data.solarTerms.previous.name}${formatDateTime(data.solarTerms.previous.date)}-${data.solarTerms.next.name}${formatDateTime(data.solarTerms.next.date)}`
+			});
+		}
+
 		// 干支历与时辰调整按钮在同一行
 		const gzhRow = timeDiv.createEl('div');
 		gzhRow.addClass('gzh-row');
 		const gzhSpan = gzhRow.createEl('span');
 		gzhSpan.appendText('干支历： ');
-		gzhSpan.addClass('gzh-text'); 
+		gzhSpan.addClass('gzh-text');
 
 		// 年柱
 		const yearGanSpan = gzhSpan.createEl('span');
@@ -332,19 +342,6 @@ export class BaziView extends ItemView {
 		hourMinusBtn.addEventListener('click', () => adjustTime(-1));
 		hourPlusBtn.addEventListener('click', () => adjustTime(1));
 
-		// 节气信息
-		if (data.solarTerms.previous && data.solarTerms.next) {
-			const solarDiv = resultContainer.createEl('div');
-			const formatDateTime = (date: Date) => {
-				const hours = date.getHours().toString().padStart(2, '0');
-				const minutes = date.getMinutes().toString().padStart(2, '0');
-				return `${date.getMonth() + 1}/${date.getDate()} ${hours}:${minutes}`;
-			};
-			solarDiv.createEl('p', {
-				text: `节气：${data.solarTerms.previous.name}${formatDateTime(data.solarTerms.previous.date)}-${data.solarTerms.next.name}${formatDateTime(data.solarTerms.next.date)}`
-			});
-		}
-
 		// 干支四柱表格
 		this.createBaziTable(resultContainer, data);
 
@@ -355,7 +352,13 @@ export class BaziView extends ItemView {
 			const xiaoyunYear = data.year + (data.selectedLiunianIndex ?? 0);
 			// 计算命主虚岁：流年年份 - 出生年份 + 1
 			const age = xiaoyunYear - data.year + 1;
-			displayText = `小运。流年：${xiaoyunYear}年，${age}岁`;
+			// 计算小运干支
+			const hourGan = data.bazi.gztg[3] || '';
+			const hourZhi = data.bazi.dz[3] || '';
+			const xiaoYun = this.paipan.getXiaoYun(hourGan, hourZhi, data.year, data.gender, age);
+			const selectedLiunianYear = data.year + (data.selectedLiunianIndex ?? 0);
+			const liuNianGanZhi = this.paipan.getYearGanZhi(selectedLiunianYear);
+			displayText = `小运：${xiaoYun.gan}${xiaoYun.zhi}。流年：${xiaoyunYear}年${liuNianGanZhi.gan}${liuNianGanZhi.zhi}，${age}岁`;
 		} else {
 			const selectedDayunForDisplay = data.dayun.allDayun[data.selectedDayunIndex ?? 0] || data.dayun.currentDayun;
 			const selectedLiunianIndex = data.selectedLiunianIndex ?? 0;
@@ -385,6 +388,7 @@ export class BaziView extends ItemView {
 
 		// 小运按钮 - 放在大运列表首位
 		const firstDayunAge = data.dayun.allDayun[0]?.age ?? data.dayun.startAge;
+		// 小运范围：1岁到起运年龄
 		const xiaoyunAgeRange = firstDayunAge >= 1 ? `1-${firstDayunAge}` : '1';
 		const xiaoyunBtn = dayunList.createEl('button', {
 			cls: (isXiaoyunSelected ? 'dayun-btn is-selected' : 'dayun-btn')
@@ -473,6 +477,9 @@ export class BaziView extends ItemView {
 		// 显示的流年数量：小运模式显示实际年份数，最多10年
 		const displayYearCount = isXiaoyunMode ? Math.min(xiaoyunYearCount, 10) : 10;
 
+		// 获取选中大运用于计算小运年龄
+		const selectedDayunForLiunian = isXiaoyunMode ? null : (data.dayun.allDayun[selectedIndex] || data.dayun.currentDayun);
+
 		for (let i = 0; i < displayYearCount; i++) {
 			const year = dayunStartYear + i;
 			const liuNianGanZhi = this.paipan.getYearGanZhi(year);
@@ -486,12 +493,16 @@ export class BaziView extends ItemView {
 				console.error('时柱天干地支数据无效');
 				continue;
 			}
+			// 计算小运年龄：小运模式从1岁开始
+			// 大运模式下，大运第一年的小运应该比小运最后一年再往后推一位
+			// 例如：小运最后一年是5岁(step=5)，大运第一年的小运应该是step=6
+			const xiaoYunAge = isXiaoyunMode ? (i + 1) : (selectedDayunForLiunian!.age + i + 1);
 			const xiaoYun = this.paipan.getXiaoYun(
 				hourGan,          // 时柱天干
 				hourZhi,          // 时柱地支
 				data.year,        // 出生年
 				data.gender,      // 性别
-				data.dayun.currentDayun.age + i  // 年龄 = 大运起始年龄 + 偏移量
+				xiaoYunAge        // 年龄
 			);
 			const btn = liunianList.createEl('button', {
 				cls: (i === selectedLiunianIndex ? 'liunian-btn is-selected' : 'liunian-btn')
@@ -544,21 +555,41 @@ export class BaziView extends ItemView {
 			marginTop: '5px'
 		});
 
-		// 获取选中大运的年份范围和选中流年
-		const selectedDayunIndex = data.selectedDayunIndex ?? 0;
-		const selectedDayun = data.dayun.allDayun[selectedDayunIndex] || data.dayun.currentDayun;
-		const dayunStartYear = selectedDayun.startYear;
+		// 判断是否是小运模式
+		const isXiaoyunMode = data.selectedDayunIndex === -1;
 		const selectedLiunianIndex = data.selectedLiunianIndex ?? 0;
-		const liunianYear = dayunStartYear + selectedLiunianIndex;
+
+		// 获取选中流年的年份和干支
+		let liunianYear: number;
+		let dayunGan: string;
+		let dayunZhi: string;
+		let dayunHeaderTitle: string;
+
+		if (isXiaoyunMode) {
+			// 小运模式：流年年份 = 出生年 + 流年索引
+			liunianYear = data.year + selectedLiunianIndex;
+			// 计算小运干支：虚岁 = 流年年份 - 出生年 + 1
+			const age = liunianYear - data.year + 1;
+			const hourGan = data.bazi.gztg[3] || '';
+			const hourZhi = data.bazi.dz[3] || '';
+			const xiaoYun = this.paipan.getXiaoYun(hourGan, hourZhi, data.year, data.gender, age);
+			dayunGan = xiaoYun.gan;
+			dayunZhi = xiaoYun.zhi;
+			dayunHeaderTitle = '小运';
+		} else {
+			// 大运模式
+			const selectedDayunIndex = data.selectedDayunIndex ?? 0;
+			const selectedDayun = data.dayun.allDayun[selectedDayunIndex] || data.dayun.currentDayun;
+			liunianYear = selectedDayun.startYear + selectedLiunianIndex;
+			dayunGan = selectedDayun.gan;
+			dayunZhi = selectedDayun.zhi;
+			dayunHeaderTitle = '大运';
+		}
 
 		// 获取选中流年的干支
 		const liuNianGanZhi = this.paipan.getYearGanZhi(liunianYear);
 		const liuNianGan = liuNianGanZhi.gan;
 		const liuNianZhi = liuNianGanZhi.zhi;
-
-		// 获取选中的大运干支
-		const dayunGan = selectedDayun.gan;
-		const dayunZhi = selectedDayun.zhi;
 
 		// 四柱干支
 		const pillars: Array<{ name: string, gan: string, zhi: string }> = [
@@ -574,7 +605,7 @@ export class BaziView extends ItemView {
 
 		// 第一行：标题（含首列时间）
 		const headerRow = table.createEl('tr');
-		['时间', '年柱', '月柱', '日柱', '时柱', '大运', '流年'].forEach(title => {
+		['时间', '年柱', '月柱', '日柱', '时柱', dayunHeaderTitle, '流年'].forEach(title => {
 			const th = headerRow.createEl('th');
 			th.setText(title);
 			th.setCssProps({

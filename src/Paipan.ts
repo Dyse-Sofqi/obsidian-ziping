@@ -347,8 +347,8 @@ export class Paipan {
             return { gan: '', zhi: '' };
         }
         
-        // 计算步数（第一步是下一步）
-        const step = age + 1;
+        // 计算步数（1岁小运是时柱后推1位，与时柱相邻）
+        const step = age;
         
         // 计算新索引（60年一个完整周期）
         const newGanIndex = isForward 

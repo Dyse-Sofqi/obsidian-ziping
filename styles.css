@@ -1,3 +1,9 @@
+.button-row-ziping {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
 /* 八字排盘段落样式 */
 #bazi-result p {
     line-height: 0.7;
