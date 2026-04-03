@@ -903,7 +903,7 @@ class TimeSettingModal extends Modal {
 		// 正确设置容器为 flex 并垂直居中
 		const nameGenderRow = tabContent.createEl('div');
 		nameGenderRow.style.display = 'flex';
-		nameGenderRow.style.gap = '10px';
+		nameGenderRow.style.gap = '0px';
 		nameGenderRow.style.alignItems = 'center';   // 关键：容器控制子元素垂直居中
 		nameGenderRow.style.margin = '3px 0px 3px 0px';
 
@@ -923,7 +923,7 @@ class TimeSettingModal extends Modal {
 			type: 'text',
 			value: defaultName
 		});
-		nameInput.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '3px' });
+		nameInput.style.marginRight = '10px';
 
 		// 点击后自动清除默认文本
 		nameInput.addEventListener('focus', () => {
@@ -940,7 +940,7 @@ class TimeSettingModal extends Modal {
 		});
 
 		// 性别选择
-		const genderLabel = nameGenderRow.createEl('label', { text: '性别: ' });
+		const genderLabel = nameGenderRow.createEl('label', { text: '性别：' });
 		const genderContainer = nameGenderRow.createEl('div');
 		genderContainer.style.display = 'flex';
 		genderContainer.style.gap = '0px';
@@ -985,12 +985,16 @@ class TimeSettingModal extends Modal {
 		const provinceLabel = cityContainer.createEl('span');
 		provinceLabel.setText('省份：');
 		const provinceSelect = cityContainer.createEl('select');
-		provinceSelect.setCssProps({ marginRight: '10px' });
+		provinceSelect.style.marginRight = '10px';
+		provinceSelect.style.border = '1px solid #ccc'
+		provinceSelect.style.boxShadow = 'none';
 
 		// 城市选择
 		const cityLabel = cityContainer.createEl('span');
 		cityLabel.setText('城市：');
 		const citySelect = cityContainer.createEl('select');
+		citySelect.style.border = '1px solid #ccc'
+		citySelect.style.boxShadow = 'none';
 
 		// 填充省份下拉框
 		PROVINCE_CITY_GROUPS.forEach((group, index) => {
