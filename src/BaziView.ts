@@ -903,12 +903,12 @@ class TimeSettingModal extends Modal {
 		// 正确设置容器为 flex 并垂直居中
 		const nameGenderRow = tabContent.createEl('div');
 		nameGenderRow.style.display = 'flex';
-		nameGenderRow.style.gap = '20px';
+		nameGenderRow.style.gap = '10px';
 		nameGenderRow.style.alignItems = 'center';   // 关键：容器控制子元素垂直居中
 		nameGenderRow.style.margin = '3px 0px 3px 0px';
 
 		// 姓名输入
-		const nameLabel = nameGenderRow.createEl('label', { text: '姓名: ' });
+		const nameLabel = nameGenderRow.createEl('label', { text: '姓名：' });
 		// 不需要对 label 设置 alignItems
 
 		// 生成排盘码作为默认值
@@ -980,16 +980,16 @@ class TimeSettingModal extends Modal {
 		cityContainer.style.gap = '0px';
 		cityContainer.style.alignItems = 'center';   // 关键：容器控制子元素垂直居中
 		cityContainer.style.margin = '3px 0px 3px 0px';
-		
+
 		// 省份选择
 		const provinceLabel = cityContainer.createEl('span');
-		provinceLabel.setText('省份: ');
+		provinceLabel.setText('省份：');
 		const provinceSelect = cityContainer.createEl('select');
 		provinceSelect.setCssProps({ marginRight: '10px' });
 
 		// 城市选择
 		const cityLabel = cityContainer.createEl('span');
-		cityLabel.setText('城市: ');
+		cityLabel.setText('城市：');
 		const citySelect = cityContainer.createEl('select');
 
 		// 填充省份下拉框
