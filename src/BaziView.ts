@@ -755,64 +755,6 @@ export class BaziView extends ItemView {
 	}
 }
 
-class TitleInputModal extends Modal {
-	onSubmit: (title: string) => void;
-
-	constructor(app: App, onSubmit: (title: string) => void) {
-		super(app);
-		this.onSubmit = onSubmit;
-	}
-
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.setText('输入案例标题');
-
-		const input = contentEl.createEl('input', {
-			type: 'text',
-			placeholder: '命例'
-		});
-		input.value = '命例';
-		input.setCssProps({
-			width: '100%',
-			marginBottom: '10px'
-		});
-
-		const buttonContainer = contentEl.createEl('div');
-		buttonContainer.setCssProps({
-			display: 'flex',
-			gap: '10px',
-			justifyContent: 'flex-end'
-		});
-
-		const cancelBtn = buttonContainer.createEl('button', { text: '取消' });
-		cancelBtn.addEventListener('click', () => {
-			this.close();
-		});
-
-		const submitBtn = buttonContainer.createEl('button', { text: '确定' });
-		submitBtn.addEventListener('click', () => {
-			this.onSubmit(input.value.trim());
-			this.close();
-		});
-
-		// 回车键提交
-		input.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter') {
-				this.onSubmit(input.value.trim());
-				this.close();
-			}
-		});
-
-		// 聚焦到输入框
-		setTimeout(() => input.focus(), 10);
-	}
-
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
-	}
-}
-
 class TimeSettingModal extends Modal {
 	view: BaziView;
 
@@ -848,7 +790,7 @@ class TimeSettingModal extends Modal {
 			gap: '0px', 
 			margin: '6px 0px 3px 0px'
 		});
-		const tabs = ['公历', '农历', '干支'];
+		const tabs = ['公历', '农历', '干支历'];
 		let activeTab = 0;
 
 		const tabButtons = tabContainer.createEl('div');
@@ -859,6 +801,7 @@ class TimeSettingModal extends Modal {
 			tabButtonElements.push(btn);
 			// 设置按钮基础样式
 			btn.style.borderRadius = '0px';
+			btn.style.outline = '1px solid #ccc';
 			btn.style.boxShadow = 'none';
 			btn.style.backgroundColor = '#f1f1f1';
 			btn.addEventListener('click', () => {
