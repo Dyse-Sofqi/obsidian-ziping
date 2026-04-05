@@ -883,7 +883,90 @@ export class BaziView extends ItemView {
 			return;
 		}
 
-		// 创建下拉列表
+		// 如果只有一条记录，直接自动加载
+		if (results.size === 1) {
+			const [firstCode] = results.keys();
+			this.loadPaiPanFromCode(firstCode, results.get(firstCode) || '未命名');
+			return;
+		}
+
+		// 如果有多条记录，才显示弹窗进行选择
+		this.showPaiPanSelectionModal(results);
+	}
+
+	private loadPaiPanFromCode(code: string, name: string): void {
+		// 解析排盘码
+		const codeRegex = /^(\d{4})\.(\d{2})\.(\d{2})-(\d{2})\.(\d{2})-(X|Y)$/;
+		const match = code.match(codeRegex);
+		
+		if (match && match[1] && match[2] && match[3] && match[4] && match[5] && match[6]) {
+			const year = parseInt(match[1]);
+			const month = parseInt(match[2]);
+			const day = parseInt(match[3]);
+			const hour = parseInt(match[4]);
+			const minute = parseInt(match[5]);
+			const gender = match[6]; // X表示女，Y表示男
+			
+			// 更新currentData并触发重新渲染
+			if (!this.currentData) {
+				this.currentData = {
+					year: 0,
+					month: 0, 
+					day: 0,
+					hour: 0,
+					minute: 0,
+					second: 0,
+					amOrPm: 'am',
+					gender: 0,
+					name: '',
+					bazi: {} as BaziResult,
+					solarTerms: {} as NearbySolarTerms,
+					dayun: {} as CurrentDayunData,
+					timeCorrectionEnabled: false
+				};
+			}
+			
+			this.currentData.year = year;
+			this.currentData.month = month;
+			this.currentData.day = day;
+			this.currentData.hour = hour;
+			this.currentData.minute = minute;
+			this.currentData.second = 0;
+			this.currentData.gender = gender === 'Y' ? 0 : 1; // Y表示男，X表示女
+			this.currentData.amOrPm = hour >= 0 && hour < 12 ? 'am' : 'pm';
+			
+			// 设置姓名
+			if (name && name !== '未命名') {
+				this.currentData.name = name;
+			} else {
+				this.currentData.name = '';
+			}
+			
+			// 重新计算八字数据（通过调用Paipan类的计算方法）
+			this.paipan.J = parseFloat(this.plugin.settings.longitude);
+			this.paipan.W = parseFloat(this.plugin.settings.latitude);
+			this.currentData.bazi = this.paipan.fatemaps(this.currentData.gender, year, month, day, hour, minute, 0, false);
+			this.currentData.dayun = this.paipan.getCurrentDayun(year, month, day, this.currentData.gender);
+			this.currentData.solarTerms = this.paipan.getNearbySolarTerms(year, month, day);
+			
+			// 清除并重新渲染界面，确保结果显示
+			const container = this.containerEl.children[1] as HTMLElement;
+			if (container) {
+				container.empty();
+				this.renderContent(container);
+				
+				// 等待界面渲染完成后再显示排盘结果
+				setTimeout(() => {
+					this.displayResults();
+				}, 0);
+			}
+			new Notice(`已自动加载排盘码：${code}`);
+		} else {
+			new Notice('排盘码格式错误，无法加载');
+		}
+	}
+
+	private showPaiPanSelectionModal(results: Map<string, string>): void {
 		const modal = new Modal(this.app);
 		modal.titleEl.setText('选择排盘');
 		
@@ -917,69 +1000,10 @@ export class BaziView extends ItemView {
 				new Notice('请选择一个排盘');
 				return;
 			}
-
-			// 解析选中的排盘码
-			const codeRegex = /^(\d{4})\.(\d{2})\.(\d{2})-(\d{2})\.(\d{2})-(X|Y)$/;
-			const match = selectedCode.match(codeRegex);
 			
-			if (match && match[1] && match[2] && match[3] && match[4] && match[5] && match[6]) {
-				const year = parseInt(match[1]);
-				const month = parseInt(match[2]);
-				const day = parseInt(match[3]);
-				const hour = parseInt(match[4]);
-				const minute = parseInt(match[5]);
-				const gender = match[6]; // X表示女，Y表示男
-				
-				// 更新currentData并触发重新渲染
-			if (!this.currentData) {
-				this.currentData = {
-					year: 0,
-					month: 0, 
-					day: 0,
-					hour: 0,
-					minute: 0,
-					second: 0,
-					amOrPm: 'am',
-					gender: 0,
-					name: '',
-					bazi: {} as BaziResult,
-					solarTerms: {} as NearbySolarTerms,
-					dayun: {} as CurrentDayunData,
-					timeCorrectionEnabled: false
-				};
-			}
-			
-			this.currentData.year = year;
-			this.currentData.month = month;
-			this.currentData.day = day;
-			this.currentData.hour = hour;
-			this.currentData.minute = minute;
-			this.currentData.second = 0;
-			this.currentData.gender = gender === 'Y' ? 0 : 1; // Y表示男，X表示女
-			this.currentData.amOrPm = hour >= 0 && hour < 12 ? 'am' : 'pm';
-			
-			// 设置姓名
-			const name = results.get(selectedCode);
-			if (name && name !== '未命名') {
-				this.currentData.name = name;
-			} else {
-				this.currentData.name = '';
-			}
-			
-			// 重新计算八字数据（通过调用Paipan类的计算方法）
-			this.paipan.J = parseFloat(this.plugin.settings.longitude);
-			this.paipan.W = parseFloat(this.plugin.settings.latitude);
-			this.currentData.bazi = this.paipan.fatemaps(this.currentData.gender, year, month, day, hour, minute, 0, false);
-			this.currentData.dayun = this.paipan.getCurrentDayun(year, month, day, this.currentData.gender);
-			this.currentData.solarTerms = this.paipan.getNearbySolarTerms(year, month, day);
-				const container = this.containerEl.children[1] as HTMLElement;
-				if (container) {
-					container.empty();
-					this.renderContent(container);
-				}
-				modal.close();
-				new Notice(`已加载排盘码：${selectedCode}`);
-			}
+			const name = results.get(selectedCode) || '未命名';
+			this.loadPaiPanFromCode(selectedCode, name);
+			modal.close();
 		});
 		
 		cancelBtn.addEventListener('click', () => {
