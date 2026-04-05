@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, Modal, Notice, App } from 'obsidian';
 import { Paipan, BaziResult, CurrentDayunData, NearbySolarTerms, DayunItem } from './Paipan';
-import { CITIES, PROVINCE_CITY_GROUPS } from './settings';
+import { CITIES, PROVINCE_CITY_GROUPS, PROVINCE_CITY_DISTRICT_GROUPS } from './settings';
 import ZipingPlugin from './main';
 import { domToBlob } from 'modern-screenshot';
 
@@ -11,6 +11,7 @@ interface CurrentBaziData {
 	hour: number;
 	minute: number;
 	second: number;
+	amOrPm: string;
 	gender: number;
 	name: string;
 	bazi: BaziResult;
@@ -18,6 +19,7 @@ interface CurrentBaziData {
 	dayun: CurrentDayunData;
 	selectedDayunIndex?: number;
 	selectedLiunianIndex?: number;
+	timeCorrectionEnabled: boolean;
 }
 
 export const PAIPAN_VIEW_TYPE = "paipan-view";
@@ -30,7 +32,7 @@ export class BaziView extends ItemView {
 	constructor(leaf: WorkspaceLeaf, plugin: ZipingPlugin) {
 		super(leaf);
 		this.plugin = plugin;
-		this.paipan = new Paipan();
+		this.paipan = new Paipan(false); // 使用默认值false，表单复选框会动态传入时间校准设置
 		this.paipan.J = parseFloat(plugin.settings.longitude);
 		this.paipan.W = parseFloat(plugin.settings.latitude);
 		this.currentData = null;
@@ -46,6 +48,67 @@ export class BaziView extends ItemView {
 
 	getIcon() {
 		return "calendar";
+	}
+
+	// 根据区县名称查找完整的地理信息数据
+	private findLocationData(districtName: string, cityName: string, provinceName: string): {longitude: number, latitude: number} | null {
+		// 如果没有区县名称，尝试使用城市名称
+		if (!districtName && !cityName && !provinceName) {
+			return null;
+		}
+
+		// 搜索三级联动数据结构
+		for (const group of PROVINCE_CITY_DISTRICT_GROUPS) {
+			// 检查省份名称是否匹配（如果提供了省份）
+			if (provinceName && group.province.name !== provinceName) {
+				continue;
+			}
+            
+			// 在城市的区县中查找
+			for (const city of group.cities) {
+				// 检查城市名称是否匹配（如果提供了城市）
+				if (cityName && city.name !== cityName) {
+					continue;
+				}
+                
+				// 查找对应的区县
+				const districts = group.districts.get(city.id);
+				if (districts) {
+					for (const district of districts) {
+						if (district.name === districtName || (!districtName && city.name === cityName)) {
+							// 返回找到的经纬度数据
+							return {
+								longitude: district.longitude,
+								latitude: district.latitude
+							};
+						}
+					}
+				} else if (!districtName && cityName && city.name === cityName) {
+					// 如果没有区县数据但城市匹配，使用城市的中心坐标（如果可用）
+					// 这里需要从原CITIES数组中查找
+					const cityData = CITIES.find(c => c.name === cityName);
+					if (cityData) {
+						return {
+							longitude: cityData.longitude,
+							latitude: cityData.latitude
+						};
+					}
+				}
+			}
+		}
+        
+		// 如果没有找到区县数据，尝试从原CITIES数组查找城市
+		if (cityName && !districtName) {
+			const cityData = CITIES.find(c => c.name === cityName);
+			if (cityData) {
+				return {
+					longitude: cityData.longitude,
+					latitude: cityData.latitude
+				};
+			}
+		}
+        
+		return null;
 	}
 
 	async onOpen() {
@@ -81,6 +144,12 @@ export class BaziView extends ItemView {
 			this.saveCase();
 		});
 
+		// 识别排盘按钮
+		const identifyBtn = buttonRow.createEl('button', { text: '识别排盘', cls: 'identify-btn' });
+		identifyBtn.addEventListener('click', () => {
+			this.identifyPaiPanCodes();
+		});
+
 		//复制截图到剪切板
 		// 调用 createResultArea，传入 buttonRow 或直接获取 copyBtn 后添加
 		const copyBtn = this.createResultArea(container); // 修改 createResultArea 使其返回按钮
@@ -99,7 +168,8 @@ export class BaziView extends ItemView {
 			now.getMinutes(),
 			now.getSeconds(),
 			0, // 默认男
-			'案例' // 默认姓名
+			'案例', // 重置姓名为默认值
+			false // 重置校时状态为未勾选
 		);
 	}
 
@@ -164,9 +234,9 @@ export class BaziView extends ItemView {
 		return copyBtn;
 	}
 
-	calculateAndDisplay(year: number, month: number, day: number, hour: number, minute: number, second: number, gender: number, name: string = '案例') {
+	calculateAndDisplay(year: number, month: number, day: number, hour: number, minute: number, second: number, gender: number, name: string = '案例', timeCorrectionEnabled?: boolean) {
 		try {
-			const bazi = this.paipan.fatemaps(gender, year, month, day, hour, minute, second);
+			const bazi = this.paipan.fatemaps(gender, year, month, day, hour, minute, second, timeCorrectionEnabled);
 			const solarTerms = this.paipan.getNearbySolarTerms(year, month, day);
 			const dayunData = this.paipan.getCurrentDayun(year, month, day, gender);
 
@@ -204,14 +274,16 @@ export class BaziView extends ItemView {
 				name = `${String(year)}.${String(month).padStart(2, '0')}.${String(day).padStart(2, '0')}-${String(hour).padStart(2, '0')}.${String(minute).padStart(2, '0')}-${genderCode}`;
 			}
 
-			this.currentData = {
-				year, month, day, hour, minute, second, gender, name,
-				bazi,
-				solarTerms,
-				dayun: dayunData,
-				selectedDayunIndex: defaultDayunIndex,
-				selectedLiunianIndex: defaultLiunianIndex
-			};
+		this.currentData = {
+			year, month, day, hour, minute, second, gender, name,
+			amOrPm: hour >= 0 && hour < 12 ? 'am' : 'pm',
+			bazi,
+			solarTerms,
+			dayun: dayunData,
+			selectedDayunIndex: defaultDayunIndex,
+			selectedLiunianIndex: defaultLiunianIndex,
+			timeCorrectionEnabled: timeCorrectionEnabled || false
+		};
 
 			this.displayResults();
 		} catch (error) {
@@ -233,11 +305,16 @@ export class BaziView extends ItemView {
 		const date = new Date(data.year, data.month - 1, data.day, data.hour, data.minute, data.second);
 
 		// 真太阳时与公历在同一行展示
-		let timeText = `公历：${date.getFullYear()}年${data.month}月${data.day}日 ${String(data.hour).padStart(2, '0')}:${String(data.minute).padStart(2, '0')}:${String(data.second).padStart(2, '0')}`;
-		if (data.bazi.zty) {
+		let timeText = '';
+		if (data.timeCorrectionEnabled && data.bazi.zty) {
+			// 校时开启：公历显示真太阳时，添加北京时间显示
 			const zty = data.bazi.zty;
-			const cityName = this.plugin.settings.city || '';
-			timeText += ` | 真太阳时：${String(zty.hour).padStart(2, '0')}:${String(zty.minute).padStart(2, '0')}:${String(zty.second).padStart(2, '0')}`;
+			timeText = `公历：${date.getFullYear()}年${data.month}月${data.day}日 ${String(zty.hour).padStart(2, '0')}:${String(zty.minute).padStart(2, '0')}:${String(zty.second).padStart(2, '0')}`;
+			// 添加北京时间（未校正前的时间）
+			timeText += ` | 北京时间：${String(data.hour).padStart(2, '0')}:${String(data.minute).padStart(2, '0')}:${String(data.second).padStart(2, '0')}`;
+		} else {
+			// 校时关闭：只显示公历时间
+			timeText = `公历：${date.getFullYear()}年${data.month}月${data.day}日 ${String(data.hour).padStart(2, '0')}:${String(data.minute).padStart(2, '0')}:${String(data.second).padStart(2, '0')}`;
 		}
 		timeDiv.createEl('p', { text: timeText });
 
@@ -540,9 +617,11 @@ export class BaziView extends ItemView {
 			btn.addEventListener('click', () => {
 				const dayunIdx = isXiaoyunMode ? -1 : selectedIndex;
 				this.selectLiunian(dayunIdx, i);
-			});
-		}
+		});
 	}
+
+
+}
 
 	createBaziTable(container: Element, data: CurrentBaziData) {
 		// 确保数据完整性
@@ -739,19 +818,175 @@ export class BaziView extends ItemView {
 		this.displayResults();
 	}
 
-	saveCase() {
-		if (!this.currentData) {
-			new Notice('请先计算八字');
-			return;
-		}
+		saveCase() {
+			if (!this.currentData) {
+				new Notice('请先计算八字');
+				return;
+			}
 
-		// 生成排盘码作为默认标题
-		const genderCode = this.currentData.gender === 0 ? 'Y' : 'X';
-		const defaultTitle = `${String(this.currentData.year)}.${String(this.currentData.month).padStart(2, '0')}.${String(this.currentData.day).padStart(2, '0')}-${String(this.currentData.hour).padStart(2, '0')}.${String(this.currentData.minute).padStart(2, '0')}-${genderCode}`;
+			// 生成排盘码作为默认标题 - 根据校时状态使用正确的时间
+			const genderCode = this.currentData.gender === 0 ? 'Y' : 'X';
+			const hour = this.currentData.timeCorrectionEnabled && this.currentData.bazi.zty ? this.currentData.bazi.zty.hour : this.currentData.hour;
+			const minute = this.currentData.timeCorrectionEnabled && this.currentData.bazi.zty ? this.currentData.bazi.zty.minute : this.currentData.minute;
+			const defaultTitle = `${String(this.currentData.year)}.${String(this.currentData.month).padStart(2, '0')}.${String(this.currentData.day).padStart(2, '0')}-${String(hour).padStart(2, '0')}.${String(minute).padStart(2, '0')}-${genderCode}`;
 
 		// 如果用户已输入姓名，使用姓名；否则使用排盘码
 		const title = this.currentData.name && this.currentData.name !== defaultTitle ? this.currentData.name : defaultTitle;
 		void this.plugin.saveBaziToFile(title, this.currentData);
+	}
+
+	private async identifyPaiPanCodes(): Promise<void> {
+		// 获取当前活动文档
+		const activeFile = this.app.workspace.getActiveFile();
+		if (!activeFile) {
+			new Notice('没有找到活动的文档');
+			return;
+		}
+
+		// 读取文档内容
+		const content = await this.app.vault.read(activeFile);
+		
+		// 识别四级标题中的排盘码和姓名
+		const headingRegex = /^(####\s+.+)$/gm;
+		const codeOnlyRegex = /^(\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}-[XY])$/;
+		const codeWithNameRegex = /^(\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}-[XY])，([\u4e00-\u9fa5a-zA-Z0-9_-]+)$/;
+
+		const headings = content.match(headingRegex) || [];
+		const results = new Map();
+
+		for (let heading of headings) {
+			// 移除标题标记####和空格
+			const headingText = heading.replace(/^####\s+/, '').trim();
+			
+			// 尝试匹配排盘码+姓名的格式
+			let match = headingText.match(codeWithNameRegex);
+			if (match) {
+				const code = match[1];
+				const name = match[2];
+				results.set(code, name);
+				continue;
+			}
+
+			// 尝试匹配纯排盘码格式
+			match = headingText.match(codeOnlyRegex);
+			if (match) {
+				const code = match[1];
+				// 只有当这个排盘码还没有被设置过时，才添加为"未命名"
+				if (!results.has(code)) {
+					results.set(code, '未命名');
+				}
+			}
+		}
+
+		if (results.size === 0) {
+			new Notice('没有找到符合格式的排盘码');
+			return;
+		}
+
+		// 创建下拉列表
+		const modal = new Modal(this.app);
+		modal.titleEl.setText('选择排盘');
+		
+		const contentEl = modal.contentEl;
+		contentEl.createEl('p', { text: '请选择要加载的排盘:' });
+		
+		const selectEl = contentEl.createEl('select', { cls: 'pai-pan-select' });
+		
+		// 添加一个默认选项
+		const defaultOption = selectEl.createEl('option');
+		defaultOption.value = '';
+		defaultOption.text = '请选择...';
+		defaultOption.disabled = true;
+		defaultOption.selected = true;
+		
+		// 添加每个排盘选项
+		results.forEach((name, code) => {
+			const option = selectEl.createEl('option');
+			option.value = code;
+			option.text = `${code}，${name}`;
+		});
+		
+		// 添加确认按钮
+		const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
+		const confirmBtn = buttonContainer.createEl('button', { text: '加载' });
+		const cancelBtn = buttonContainer.createEl('button', { text: '取消' });
+		
+		confirmBtn.addEventListener('click', () => {
+			const selectedCode = selectEl.value;
+			if (!selectedCode) {
+				new Notice('请选择一个排盘');
+				return;
+			}
+
+			// 解析选中的排盘码
+			const codeRegex = /^(\d{4})\.(\d{2})\.(\d{2})-(\d{2})\.(\d{2})-(X|Y)$/;
+			const match = selectedCode.match(codeRegex);
+			
+			if (match && match[1] && match[2] && match[3] && match[4] && match[5] && match[6]) {
+				const year = parseInt(match[1]);
+				const month = parseInt(match[2]);
+				const day = parseInt(match[3]);
+				const hour = parseInt(match[4]);
+				const minute = parseInt(match[5]);
+				const gender = match[6]; // X表示女，Y表示男
+				
+				// 更新currentData并触发重新渲染
+			if (!this.currentData) {
+				this.currentData = {
+					year: 0,
+					month: 0, 
+					day: 0,
+					hour: 0,
+					minute: 0,
+					second: 0,
+					amOrPm: 'am',
+					gender: 0,
+					name: '',
+					bazi: {} as BaziResult,
+					solarTerms: {} as NearbySolarTerms,
+					dayun: {} as CurrentDayunData,
+					timeCorrectionEnabled: false
+				};
+			}
+			
+			this.currentData.year = year;
+			this.currentData.month = month;
+			this.currentData.day = day;
+			this.currentData.hour = hour;
+			this.currentData.minute = minute;
+			this.currentData.second = 0;
+			this.currentData.gender = gender === 'Y' ? 0 : 1; // Y表示男，X表示女
+			this.currentData.amOrPm = hour >= 0 && hour < 12 ? 'am' : 'pm';
+			
+			// 设置姓名
+			const name = results.get(selectedCode);
+			if (name && name !== '未命名') {
+				this.currentData.name = name;
+			} else {
+				this.currentData.name = '';
+			}
+			
+			// 重新计算八字数据（通过调用Paipan类的计算方法）
+			this.paipan.J = parseFloat(this.plugin.settings.longitude);
+			this.paipan.W = parseFloat(this.plugin.settings.latitude);
+			this.currentData.bazi = this.paipan.fatemaps(this.currentData.gender, year, month, day, hour, minute, 0, false);
+			this.currentData.dayun = this.paipan.getCurrentDayun(year, month, day, this.currentData.gender);
+			this.currentData.solarTerms = this.paipan.getNearbySolarTerms(year, month, day);
+				const container = this.containerEl.children[1] as HTMLElement;
+				if (container) {
+					container.empty();
+					this.renderContent(container);
+				}
+				modal.close();
+				new Notice(`已加载排盘码：${selectedCode}`);
+			}
+		});
+		
+		cancelBtn.addEventListener('click', () => {
+			modal.close();
+		});
+		
+		modal.open();
 	}
 }
 
@@ -842,6 +1077,9 @@ class TimeSettingModal extends Modal {
 		const tabContent = contentEl.createEl('div');
 		tabContent.addClass('tab-content');
 
+		// 获取当前盘面数据
+		const currentData = this.view.currentData;
+
 		// 姓名和性别在同一行
 		// 正确设置容器为 flex 并垂直居中
 		const nameGenderRow = tabContent.createEl('div');
@@ -855,9 +1093,12 @@ class TimeSettingModal extends Modal {
 		// 不需要对 label 设置 alignItems
 
 		// 生成排盘码作为默认值
-		const currentData = this.view.currentData;
 		let defaultName = '案例';
-		if (currentData) {
+		if (currentData && currentData.name && currentData.name !== '案例') {
+			// 如果当前已有有效姓名，则使用当前姓名
+			defaultName = currentData.name;
+		} else if (currentData) {
+			// 如果没有有效姓名，则生成排盘码
 			const genderCode = currentData.gender === 0 ? 'Y' : 'X';
 			defaultName = `${String(currentData.year)}.${String(currentData.month).padStart(2, '0')}.${String(currentData.day).padStart(2, '0')}-${String(currentData.hour).padStart(2, '0')}.${String(currentData.minute).padStart(2, '0')}-${genderCode}`;
 		}
@@ -896,7 +1137,8 @@ class TimeSettingModal extends Modal {
 			value: '0'
 		});
 		maleRadio.setAttribute('name', 'gender');
-		maleRadio.checked = true;
+		// 设置默认选择状态
+		maleRadio.checked = currentData?.gender === 0;
 		const maleLabel = genderContainer.createEl('label', { text: '男' });
 		maleLabel.style.marginRight = '10px';
 
@@ -906,6 +1148,8 @@ class TimeSettingModal extends Modal {
 			value: '1'
 		});
 		femaleRadio.setAttribute('name', 'gender');
+		// 设置默认选择状态
+		femaleRadio.checked = currentData?.gender === 1;
 		const femaleLabel = genderContainer.createEl('label', { text: '女' });
 		femaleLabel.setCssProps({ marginLeft: '5px' });
 
@@ -917,74 +1161,206 @@ class TimeSettingModal extends Modal {
 			this.renderBaziTab(tabContent);
 		}
 
-		// 城市选择 - 两级联动
+		// 校时复选框
+		const timeCorrectionContainer = tabContent.createEl('div');
+		timeCorrectionContainer.style.display = 'flex';
+		timeCorrectionContainer.style.gap = '0px';
+		timeCorrectionContainer.style.alignItems = 'center';
+		timeCorrectionContainer.style.margin = '3px 0px 3px 0px';
+
+		const timeCorrectionCheckbox = timeCorrectionContainer.createEl('input', {
+			type: 'checkbox'
+		});
+		timeCorrectionCheckbox.id = 'time-correction-checkbox';
+		const timeCorrectionLabel = timeCorrectionContainer.createEl('label', { text: '校时' });
+		timeCorrectionLabel.htmlFor = 'time-correction-checkbox';
+		timeCorrectionLabel.style.marginLeft = '5px';
+
+		// 城市选择 - 省市区三级联动
 		const cityContainer = tabContent.createEl('div');
 		cityContainer.style.display = 'flex';
 		cityContainer.style.gap = '0px';
 		cityContainer.style.alignItems = 'center';   // 关键：容器控制子元素垂直居中
 		cityContainer.style.margin = '3px 0px 3px 0px';
+		cityContainer.style.flexWrap = 'wrap'; // 允许换行以适应三个下拉框
 
 		// 省份选择
 		const provinceLabel = cityContainer.createEl('span');
 		provinceLabel.setText('省份：');
 		const provinceSelect = cityContainer.createEl('select');
+		provinceSelect.id = 'province-select';
 		provinceSelect.style.marginRight = '10px';
 		provinceSelect.style.border = '1px solid #ccc'
 		provinceSelect.style.boxShadow = 'none';
 
-		// 城市选择
+		// 地级市选择
 		const cityLabel = cityContainer.createEl('span');
-		cityLabel.setText('城市：');
+		cityLabel.setText('地级市：');
 		const citySelect = cityContainer.createEl('select');
+		citySelect.id = 'city-select';
+		citySelect.style.marginRight = '10px';
 		citySelect.style.border = '1px solid #ccc'
 		citySelect.style.boxShadow = 'none';
 
-		// 填充省份下拉框
-		PROVINCE_CITY_GROUPS.forEach((group, index) => {
-			provinceSelect.createEl('option', { text: group.province.name, value: index.toString() });
-		});
+		// 区县选择
+		const districtLabel = cityContainer.createEl('span');
+		districtLabel.setText('区县：');
+		const districtSelect = cityContainer.createEl('select');
+		districtSelect.id = 'district-select';
+		districtSelect.style.border = '1px solid #ccc'
+		districtSelect.style.boxShadow = 'none';
 
-		// 根据当前设置确定初始省份和城市
-		const currentCity = this.view.plugin.settings.city || '杭州';
-		let initialProvinceIndex = 0;
-		let initialCityValue = currentCity;
+		// 管理时间校正状态函数
+		const manageTimeCorrectionState = (isEnabled: boolean) => {
+			// 设置所有选择器的禁用状态
+			provinceSelect.disabled = !isEnabled;
+			citySelect.disabled = !isEnabled;
+			districtSelect.disabled = !isEnabled;
+			
+			// 更新样式以反映禁用状态
+			if (!isEnabled) {
+				provinceSelect.style.backgroundColor = '#f5f5f5';
+				provinceSelect.style.color = '#888';
+				citySelect.style.backgroundColor = '#f5f5f5';
+				citySelect.style.color = '#888';
+				districtSelect.style.backgroundColor = '#f5f5f5';
+				districtSelect.style.color = '#888';
+				
+				// 清空值
+				provinceSelect.innerHTML = '';
+				provinceSelect.value = '';
+				citySelect.innerHTML = '';
+				citySelect.value = '';
+				districtSelect.innerHTML = '';
+				districtSelect.value = '';
+			} else {
+				provinceSelect.style.backgroundColor = '';
+				provinceSelect.style.color = '';
+				citySelect.style.backgroundColor = '';
+				citySelect.style.color = '';
+				districtSelect.style.backgroundColor = '';
+				districtSelect.style.color = '';
 
-		// 尝试找到当前城市对应的省份
-		for (let i = 0; i < PROVINCE_CITY_GROUPS.length; i++) {
-			const group = PROVINCE_CITY_GROUPS[i];
-			if (!group) continue;
-			const foundCity = group.cities.find(c => c.name === currentCity);
-			if (foundCity) {
-				initialProvinceIndex = i;
-				initialCityValue = foundCity.name;
-				break;
-			}
-		}
+				// 重新填充省份选择器（三级联动）
+				const emptyProvinceOption = provinceSelect.createEl('option');
+				emptyProvinceOption.textContent = '选择省份';
+				emptyProvinceOption.value = '';
+                    
+				PROVINCE_CITY_DISTRICT_GROUPS.forEach(group => {
+					provinceSelect.createEl('option', { text: group.province.name, value: group.province.name });
+				});
+				
+				// 根据当前设置重新初始化
+				const currentCity = this.view.plugin.settings.city || '杭州';
+				let initialProvinceName = '';
+				let initialCityName = currentCity;
+				let initialDistrictName = '';
+				
+				// 查找当前城市对应的省份和区县
+				outer: for (const group of PROVINCE_CITY_DISTRICT_GROUPS) {
+					for (const city of group.cities) {
+						if (city.name === currentCity) {
+							initialProvinceName = group.province.name;
+							
+							// 查找对应的区县数据
+							const districts = group.districts.get(city.id);
+							if (districts && districts.length > 0 && districts[0]) {
+							// 假设使用第一个区县作为默认值
+							initialDistrictName = districts[0].name;
+						}
+							break outer;
+						}
+					}
+				}
+                        
+				// 三级联动更新函数定义
+				const updateCityAndDistrictSelect = (provinceName: string) => {
+					// 清空城市和区县下拉框
+					citySelect.innerHTML = '';
+					districtSelect.innerHTML = '';
 
-		// 填充城市下拉框（根据选中的省份）
-		const updateCitySelect = (provinceIndex: number) => {
-			citySelect.innerHTML = '';
-			const group = PROVINCE_CITY_GROUPS[provinceIndex];
-			if (!group) return;
-			const cities = group.cities;
-			cities.forEach(city => {
-				citySelect.createEl('option', { text: city.name, value: city.name });
-			});
-			// 如果当前城市在列表中，选中它
-			const hasCurrentCity = cities.some(c => c.name === initialCityValue);
-			if (hasCurrentCity) {
-				citySelect.value = initialCityValue;
+					// 添加初始选项
+					const emptyCityOption = citySelect.createEl('option');
+					emptyCityOption.textContent = '选择地级市';
+					emptyCityOption.value = '';
+                    
+					const emptyDistrictOption = districtSelect.createEl('option');
+					emptyDistrictOption.textContent = '选择区县';
+					emptyDistrictOption.value = '';
+
+					// 找到对应省份的数据
+					const group = PROVINCE_CITY_DISTRICT_GROUPS.find(g => g.province.name === provinceName);
+					if (!group) return;
+
+					// 添加城市选项
+					group.cities.forEach(city => {
+						citySelect.createEl('option', { text: city.name, value: city.name });
+					});
+				};
+
+				// 更新区县下拉框
+				const updateDistrictSelect = (cityName: string) => {
+					districtSelect.innerHTML = '';
+
+					// 添加初始选项
+					const emptyDistrictOption = districtSelect.createEl('option');
+					emptyDistrictOption.textContent = '选择区县';
+					emptyDistrictOption.value = '';
+
+					// 找到对应城市的数据
+					for (const group of PROVINCE_CITY_DISTRICT_GROUPS) {
+						const city = group.cities.find(c => c.name === cityName);
+						if (city) {
+							const districts = group.districts.get(city.id);
+							if (districts && districts.length > 0) {
+								// 添加区县选项
+								districts.forEach(district => {
+									districtSelect.createEl('option', { text: district.name, value: district.name });
+								});
+							}
+							break;
+						}
+					}
+				};
+				
+				// 设置初始值
+				if (initialProvinceName) {
+					provinceSelect.value = initialProvinceName;
+					updateCityAndDistrictSelect(initialProvinceName);
+                    
+					if (initialCityName) {
+						citySelect.value = initialCityName;
+						updateDistrictSelect(initialCityName);
+                           
+						if (initialDistrictName) {
+							districtSelect.value = initialDistrictName;
+						}
+					}
+				}
+
+				// 重新绑定事件（三级联动）
+				// 先移除现有的事件监听器
+				provinceSelect.onchange = () => {
+					updateCityAndDistrictSelect(provinceSelect.value);
+					districtSelect.innerHTML = '';
+					const emptyDistrictOption = districtSelect.createEl('option');
+					emptyDistrictOption.textContent = '选择区县';
+					emptyDistrictOption.value = '';
+				};
+                    
+				citySelect.onchange = () => {
+					updateDistrictSelect(citySelect.value);
+				};
 			}
 		};
 
-		// 初始化
-		provinceSelect.value = initialProvinceIndex.toString();
-		updateCitySelect(initialProvinceIndex);
+		// 初始状态：使用当前盘面数据的校时状态
+		timeCorrectionCheckbox.checked = currentData?.timeCorrectionEnabled || false;
+		manageTimeCorrectionState(timeCorrectionCheckbox.checked);
 
-		// 省份变更时更新城市列表
-		provinceSelect.addEventListener('change', () => {
-			const idx = parseInt((provinceSelect as HTMLSelectElement).value);
-			updateCitySelect(idx);
+		// 复选框状态变化监听
+		timeCorrectionCheckbox.addEventListener('change', () => {
+			manageTimeCorrectionState(timeCorrectionCheckbox.checked);
 		});
 
 		// 按钮
@@ -1012,17 +1388,34 @@ class TimeSettingModal extends Modal {
 			let second: number;
 			const gender = parseInt(maleRadio.checked ? '0' : '1');
 
-			// 获取选择的城市并更新设置
-			const selectedCity = (citySelect as HTMLSelectElement).value;
-			const cityData = CITIES.find(c => c.name === selectedCity);
-			if (cityData) {
-				this.view.plugin.settings.city = selectedCity;
-				this.view.plugin.settings.longitude = cityData.longitude.toString();
-				this.view.plugin.settings.latitude = cityData.latitude.toString();
+			// 获取选择的区县并更新设置（三级联动）
+			const selectedDistrict = (districtSelect as HTMLSelectElement).value;
+			let selectedCityName = (citySelect as HTMLSelectElement).value;
+			let selectedProvinceName = (provinceSelect as HTMLSelectElement).value;
+			
+			// 使用三级联动的完整地理信息
+			const locationData = this.findLocationInGroups(selectedDistrict, selectedCityName, selectedProvinceName);
+			if (locationData) {
+				const cityDisplayName = selectedCityName || selectedDistrict;
+				this.view.plugin.settings.city = cityDisplayName;
+				this.view.plugin.settings.longitude = locationData.longitude.toString();
+				this.view.plugin.settings.latitude = locationData.latitude.toString();
 				// 更新排盘引擎的经纬度
-				this.view.paipan.J = cityData.longitude;
-				this.view.paipan.W = cityData.latitude;
+				this.view.paipan.J = locationData.longitude;
+				this.view.paipan.W = locationData.latitude;
 				void this.view.plugin.saveSettings();
+			} else if (selectedCityName) {
+				// 如果无法找到区县数据，回退到城市数据
+				const cityData = CITIES.find(c => c.name === selectedCityName);
+				if (cityData) {
+					this.view.plugin.settings.city = selectedCityName;
+					this.view.plugin.settings.longitude = cityData.longitude.toString();
+					this.view.plugin.settings.latitude = cityData.latitude.toString();
+					// 更新排盘引擎的经纬度
+					this.view.paipan.J = cityData.longitude;
+					this.view.paipan.W = cityData.latitude;
+					void this.view.plugin.saveSettings();
+				}
 			}
 
 			if (tabIndex === 0) {
@@ -1071,9 +1464,10 @@ class TimeSettingModal extends Modal {
 				second = this.selectedSecond || 0;
 			}
 
-			// 获取姓名信息
+			// 获取姓名信息和时间校准状态
 			const name = (nameInput as HTMLInputElement).value || '案例';
-			this.view.calculateAndDisplay(year, month, day, hour, minute, second, gender, name);
+			const timeCorrectionEnabled = timeCorrectionCheckbox.checked;
+			this.view.calculateAndDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled);
 			this.close();
 		});
 	}
@@ -1564,12 +1958,6 @@ class TimeSettingModal extends Modal {
 					if (results.length === 0) {
 						resultContainer.createEl('p', { text: '未找到符合条件的日期' });
 					} else {
-						// // 显示结果数量
-						// resultContainer.createEl('p', {
-						// 	text: `找到 ${results.length} 个符合条件的日期：`,
-						// 	cls: 'result-count'
-						// });
-
 						// 创建结果列表
 						const resultList = resultContainer.createEl('ul');
 						resultList.setCssProps({
@@ -1630,6 +2018,38 @@ class TimeSettingModal extends Modal {
 			}, 100);
 		});
 	}
+
+	/**
+	 * 在三级联动数据中查找地理位置信息
+	 */
+	findLocationInGroups(districtName: string, cityName: string, provinceName: string): { longitude: number; latitude: number; } | null {
+		if (!districtName || !cityName || !provinceName) return null;
+		
+		// 遍历省份-城市-区县数据
+		for (const group of PROVINCE_CITY_DISTRICT_GROUPS) {
+			if (group.province.name === provinceName) {
+				// 找到对应省份，寻找城市
+				const city = group.cities.find(c => c.name === cityName);
+				if (city) {
+					// 找到对应城市，寻找区县
+					const districts = group.districts.get(city.id);
+					if (districts && districts.length > 0) {
+						const district = districts.find(d => d.name === districtName);
+						if (district) {
+							return {
+								longitude: district.longitude,
+								latitude: district.latitude
+							};
+						}
+					}
+				}
+			}
+		}
+		
+		return null;
+	}
+
 }
+
 
 

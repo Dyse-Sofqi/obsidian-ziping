@@ -7,6 +7,7 @@ export interface CityData {
 	name: string;
 	longitude: number;
 	latitude: number;
+	fullName?: string; // 完整名称（用于区分同名地区）
 }
 
 // city.json 的数据类型
@@ -24,7 +25,30 @@ export interface ProvinceData {
 	id: number;
 }
 
-// 省份-城市分组
+// 地级市数据类型
+export interface CityLevelData {
+	name: string;
+	id: number;
+	provinceId: number;
+}
+
+// 区县数据类型
+export interface DistrictData {
+	name: string;
+	id: number;
+	cityId: number;
+	longitude: number;
+	latitude: number;
+}
+
+// 省份-地级市-区县三级分组
+export interface ProvinceCityDistrictGroup {
+	province: ProvinceData;
+	cities: CityLevelData[];
+	districts: Map<number, DistrictData[]>; // key: cityId, value: 对应的区县列表
+}
+
+// 保留原有的省份-城市分组（用于向后兼容）
 export interface ProvinceCityGroup {
 	province: ProvinceData;
 	cities: CityData[];
@@ -42,7 +66,8 @@ function loadCities(): CityData[] {
 		cities.push({
 			name: c.name.replace("市", ""),
 			longitude: c.j,
-			latitude: c.w
+			latitude: c.w,
+			fullName: c.name
 		});
 	});
 
@@ -54,7 +79,8 @@ function loadCities(): CityData[] {
 		cities.push({
 			name: c.name.replace("特别行政区", "").replace("澳门", "澳门").replace("香港", "香港"),
 			longitude: c.j,
-			latitude: c.w
+			latitude: c.w,
+			fullName: c.name
 		});
 	});
 
@@ -66,7 +92,8 @@ function loadCities(): CityData[] {
 		cities.push({
 			name: c.name.replace("市", ""),
 			longitude: c.j,
-			latitude: c.w
+			latitude: c.w,
+			fullName: c.name
 		});
 	});
 
@@ -84,6 +111,65 @@ function loadCities(): CityData[] {
 	uniqueCities.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
 
 	return uniqueCities;
+}
+
+// 加载三级行政区划数据
+function loadProvinceCityDistrictGroups(): ProvinceCityDistrictGroup[] {
+	const groups: ProvinceCityDistrictGroup[] = [];
+
+	// 1. 获取所有省份 (pid=0)
+	const provinces = cityData.filter((c: CityJsonItem) => c.pid === 0);
+
+	// 2. 为每个省份处理
+	provinces.forEach((province: CityJsonItem) => {
+		const provinceGroup: ProvinceCityDistrictGroup = {
+			province: { name: province.name, id: province.id },
+			cities: [],
+			districts: new Map()
+		};
+
+		// 获取该省份下的地级市 (pid=省份id)
+		const citiesInProvince = cityData.filter(
+			(c: CityJsonItem) => c.pid === province.id
+		);
+
+		// 处理每个地级市
+		citiesInProvince.forEach((cityItem: CityJsonItem) => {
+			// 添加地级市
+			provinceGroup.cities.push({
+				name: cityItem.name,
+				id: cityItem.id,
+				provinceId: province.id
+			});
+
+			// 获取该地级市下的区县 (pid=地级市id)
+			const districtsInCity = cityData.filter(
+				(c: CityJsonItem) => c.pid === cityItem.id
+			);
+
+			// 转换区县数据
+			const districts: DistrictData[] = districtsInCity.map((district: CityJsonItem) => ({
+				name: district.name,
+				id: district.id,
+				cityId: cityItem.id,
+				longitude: district.j,
+				latitude: district.w
+			}));
+
+			// 按名称排序
+			districts.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+
+			// 添加到地图中
+			provinceGroup.districts.set(cityItem.id, districts);
+		});
+
+		// 按城市名称排序
+		provinceGroup.cities.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+
+		groups.push(provinceGroup);
+	});
+
+	return groups;
 }
 
 // 加载省份分组数据（用于两级联动选择器）
@@ -151,6 +237,9 @@ function loadProvinceCityGroups(): ProvinceCityGroup[] {
 
 export const CITIES: CityData[] = loadCities();
 export const PROVINCE_CITY_GROUPS: ProvinceCityGroup[] = loadProvinceCityGroups();
+
+// 三级联动数据结构
+export const PROVINCE_CITY_DISTRICT_GROUPS: ProvinceCityDistrictGroup[] = loadProvinceCityDistrictGroups();
 
 export interface ZipingSettings {
 	mySetting: string;
@@ -228,6 +317,8 @@ export class ZipingSettingTab extends PluginSettingTab {
 					this.plugin.settings.casePath = value || '命例';
 					await this.plugin.saveSettings();
 				}));
+
+
 
 		new Setting(containerEl)
 			.setName('City')

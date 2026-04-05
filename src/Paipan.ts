@@ -81,8 +81,10 @@ export class Paipan {
     private engine: PaipanEngine;
     public J: number;
     public W: number;
+    private timeCorrectionEnabled: boolean;
 
-    constructor() {
+    constructor(timeCorrectionEnabled: boolean = false) {
+        this.timeCorrectionEnabled = timeCorrectionEnabled;
         if (!window.p) {
             // 如果 window.p 不存在，尝试从 window.paipan 创建
             if (typeof window.paipan === 'function') {
@@ -105,16 +107,20 @@ export class Paipan {
         return new Date(y, m - 1, d, h, min, s);
     }
 
-    fatemaps(xb: number, yy: number, mm: number, dd: number, hh: number, mt: number, ss: number): BaziResult {
-        const result = this.engine.fatemaps(xb, yy, mm, dd, hh, mt, ss, this.J, this.W);
+    fatemaps(xb: number, yy: number, mm: number, dd: number, hh: number, mt: number, ss: number, timeCorrectionEnabled?: boolean): BaziResult {
+        // 根据时间校准设置决定是否计算真太阳时（支持动态传入或使用默认设置）
+        const useTimeCorrection = timeCorrectionEnabled !== undefined ? timeCorrectionEnabled : this.timeCorrectionEnabled;
+        const jingdu = useTimeCorrection ? this.J : undefined;
+        const weidu = useTimeCorrection ? this.W : undefined;
+        
+        const result = this.engine.fatemaps(xb, yy, mm, dd, hh, mt, ss, jingdu, weidu);
         if (!result || !result.ctg || !result.cdz) {
             throw new Error('排盘失败：fatemaps无效结果');
         }
 
-        // 获取真太阳时（如果有设置经纬度）
-        // result.zty 已经是转换好的时间数组 [Y, M, D, h, mi, s]
+        // 获取真太阳时（仅在时间校准开启且有设置经纬度时）
         let zty: { hour: number; minute: number; second: number } | undefined;
-        if (result.zty !== undefined && Array.isArray(result.zty)) {
+        if (useTimeCorrection && result.zty !== undefined && Array.isArray(result.zty)) {
             // result.zty 是 [Y, M, D, h, mi, s] 格式，直接取小时、分钟、秒
             zty = {
                 hour: result.zty[3] as number,
@@ -662,11 +668,35 @@ export class Paipan {
     }
 
     // 根据年柱干支筛选年份
-    filterYearsByGanZhi(yearGan: string, yearZhi: string, startYear: number = 1900, endYear: number = 2060): number[] {
+    filterYearsByGanZhi(yearGan: string, yearZhi: string, monthZhi: string = '', dayGan: string = '', dayZhi: string = '', startYear: number = 1900, endYear: number = 2060): number[] {
         const result: number[] = [];
         for (let year = startYear; year <= endYear; year++) {
             const yearGanZhi = this.getYearGanZhi(year);
             if (yearGanZhi.gan === yearGan && yearGanZhi.zhi === yearZhi) {
+                // 如果有传入月份和日干支，进行特殊处理
+                if (monthZhi && dayGan && dayZhi) {
+                    if (monthZhi === '子') {
+                        // 子月特殊处理：检查12月6日至12月31日的日干支
+                        let foundMatch = false;
+                        for (let day = 6; day <= 31; day++) {
+                            const bazi = this.fatemaps(0, year, 12, day, 12, 0, 0);
+                            if (bazi.gztg[2] === dayGan && bazi.dz[2] === dayZhi) {
+                                foundMatch = true;
+                                break;
+                            }
+                        }
+                        // 如果都不符合，年份数值+1后返回（但需要避免重复和超出范围）
+                        if (!foundMatch && year + 1 <= endYear) {
+                            result.push(year + 1);
+                        }
+                    } else if (monthZhi === '丑') {
+                        // 丑月特殊处理：年份数值+1后返回（但需要避免重复和超出范围）
+                        if (year + 1 <= endYear) {
+                            result.push(year + 1);
+                        }
+                    }
+                }
+                // 其他月份或没有传入月份信息时，直接添加年份
                 result.push(year);
             }
         }
@@ -693,7 +723,6 @@ export class Paipan {
                 }
             }
         }
-        
         return result;
     }
 
@@ -725,7 +754,7 @@ export class Paipan {
         isLateZi: boolean = false
     ): { year: number; month: number; day: number; hour: number }[] {
         // 第一步：根据年柱干支筛选年份
-        const matchingYears = this.filterYearsByGanZhi(yearGan, yearZhi);
+        const matchingYears = this.filterYearsByGanZhi(yearGan, yearZhi, monthZhi, dayGan, dayZhi);
         
         // 第二步：根据日柱干支筛选日期
         const matchingDates = this.filterDatesByDayGanZhi(matchingYears, dayGan, dayZhi);

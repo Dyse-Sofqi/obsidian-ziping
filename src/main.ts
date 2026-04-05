@@ -124,9 +124,11 @@ export default class ZipingPlugin extends Plugin {
 		lines.push('---');
 		lines.push('');
 
-		// 2. 首行生成排盘码，并附带姓名，设置为四级标题
+		// 2. 首行生成排盘码，并附带姓名，设置为四级标题 - 根据校时状态使用正确的时间
 		const genderCode = data.gender === 0 ? 'Y' : 'X';
-		const paiPanCode = `${String(data.year)}.${String(data.month).padStart(2, '0')}.${String(data.day).padStart(2, '0')}-${String(data.hour).padStart(2, '0')}.${String(data.minute).padStart(2, '0')}-${genderCode}`;
+		const hour = data.timeCorrectionEnabled && data.bazi.zty ? data.bazi.zty.hour : data.hour;
+		const minute = data.timeCorrectionEnabled && data.bazi.zty ? data.bazi.zty.minute : data.minute;
+		const paiPanCode = `${String(data.year)}.${String(data.month).padStart(2, '0')}.${String(data.day).padStart(2, '0')}-${String(hour).padStart(2, '0')}.${String(minute).padStart(2, '0')}-${genderCode}`;
 		lines.push(`#### ${paiPanCode}，${data.name || '案例'}`);
 		lines.push('');
 
