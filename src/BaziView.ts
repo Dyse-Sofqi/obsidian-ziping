@@ -20,6 +20,7 @@ interface CurrentBaziData {
 	selectedDayunIndex?: number;
 	selectedLiunianIndex?: number;
 	timeCorrectionEnabled: boolean;
+	tag: string;
 }
 
 export const PAIPAN_VIEW_TYPE = "paipan-view";
@@ -51,7 +52,7 @@ export class BaziView extends ItemView {
 	}
 
 	// 根据区县名称查找完整的地理信息数据
-	private findLocationData(districtName: string, cityName: string, provinceName: string): {longitude: number, latitude: number} | null {
+	private findLocationData(districtName: string, cityName: string, provinceName: string): { longitude: number, latitude: number } | null {
 		// 如果没有区县名称，尝试使用城市名称
 		if (!districtName && !cityName && !provinceName) {
 			return null;
@@ -63,14 +64,14 @@ export class BaziView extends ItemView {
 			if (provinceName && group.province.name !== provinceName) {
 				continue;
 			}
-            
+
 			// 在城市的区县中查找
 			for (const city of group.cities) {
 				// 检查城市名称是否匹配（如果提供了城市）
 				if (cityName && city.name !== cityName) {
 					continue;
 				}
-                
+
 				// 查找对应的区县
 				const districts = group.districts.get(city.id);
 				if (districts) {
@@ -96,7 +97,7 @@ export class BaziView extends ItemView {
 				}
 			}
 		}
-        
+
 		// 如果没有找到区县数据，尝试从原CITIES数组查找城市
 		if (cityName && !districtName) {
 			const cityData = CITIES.find(c => c.name === cityName);
@@ -107,7 +108,7 @@ export class BaziView extends ItemView {
 				};
 			}
 		}
-        
+
 		return null;
 	}
 
@@ -169,7 +170,8 @@ export class BaziView extends ItemView {
 			now.getSeconds(),
 			0, // 默认男
 			'案例', // 重置姓名为默认值
-			false // 重置校时状态为未勾选
+			false, // 重置校时状态为未勾选
+			'' // 重置标签为空
 		);
 	}
 
@@ -234,7 +236,7 @@ export class BaziView extends ItemView {
 		return copyBtn;
 	}
 
-	calculateAndDisplay(year: number, month: number, day: number, hour: number, minute: number, second: number, gender: number, name: string = '案例', timeCorrectionEnabled?: boolean) {
+	calculateAndDisplay(year: number, month: number, day: number, hour: number, minute: number, second: number, gender: number, name: string = '案例', timeCorrectionEnabled?: boolean, tag: string = '') {
 		try {
 			const bazi = this.paipan.fatemaps(gender, year, month, day, hour, minute, second, timeCorrectionEnabled);
 			const solarTerms = this.paipan.getNearbySolarTerms(year, month, day);
@@ -274,16 +276,16 @@ export class BaziView extends ItemView {
 				name = `${String(year)}.${String(month).padStart(2, '0')}.${String(day).padStart(2, '0')}-${String(hour).padStart(2, '0')}.${String(minute).padStart(2, '0')}-${genderCode}`;
 			}
 
-		this.currentData = {
-			year, month, day, hour, minute, second, gender, name,
-			amOrPm: hour >= 0 && hour < 12 ? 'am' : 'pm',
-			bazi,
-			solarTerms,
-			dayun: dayunData,
-			selectedDayunIndex: defaultDayunIndex,
-			selectedLiunianIndex: defaultLiunianIndex,
-			timeCorrectionEnabled: timeCorrectionEnabled || false
-		};
+			this.currentData = {
+				year, month, day, hour, minute, second, gender, name, tag,
+				amOrPm: hour >= 0 && hour < 12 ? 'am' : 'pm',
+				bazi,
+				solarTerms,
+				dayun: dayunData,
+				selectedDayunIndex: defaultDayunIndex,
+				selectedLiunianIndex: defaultLiunianIndex,
+				timeCorrectionEnabled: timeCorrectionEnabled || false
+			};
 
 			this.displayResults();
 		} catch (error) {
@@ -412,7 +414,10 @@ export class BaziView extends ItemView {
 				date.getHours(),
 				date.getMinutes(),
 				date.getSeconds(),
-				this.currentData.gender
+				this.currentData.gender,
+				this.currentData.name || '案例',
+				this.currentData.timeCorrectionEnabled,
+				this.currentData.tag || ''
 			);
 		};
 
@@ -617,11 +622,11 @@ export class BaziView extends ItemView {
 			btn.addEventListener('click', () => {
 				const dayunIdx = isXiaoyunMode ? -1 : selectedIndex;
 				this.selectLiunian(dayunIdx, i);
-		});
+			});
+		}
+
+
 	}
-
-
-}
 
 	createBaziTable(container: Element, data: CurrentBaziData) {
 		// 确保数据完整性
@@ -818,17 +823,17 @@ export class BaziView extends ItemView {
 		this.displayResults();
 	}
 
-		saveCase() {
-			if (!this.currentData) {
-				new Notice('请先计算八字');
-				return;
-			}
+	saveCase() {
+		if (!this.currentData) {
+			new Notice('请先计算八字');
+			return;
+		}
 
-			// 生成排盘码作为默认标题 - 根据校时状态使用正确的时间
-			const genderCode = this.currentData.gender === 0 ? 'Y' : 'X';
-			const hour = this.currentData.timeCorrectionEnabled && this.currentData.bazi.zty ? this.currentData.bazi.zty.hour : this.currentData.hour;
-			const minute = this.currentData.timeCorrectionEnabled && this.currentData.bazi.zty ? this.currentData.bazi.zty.minute : this.currentData.minute;
-			const defaultTitle = `${String(this.currentData.year)}.${String(this.currentData.month).padStart(2, '0')}.${String(this.currentData.day).padStart(2, '0')}-${String(hour).padStart(2, '0')}.${String(minute).padStart(2, '0')}-${genderCode}`;
+		// 生成排盘码作为默认标题 - 根据校时状态使用正确的时间
+		const genderCode = this.currentData.gender === 0 ? 'Y' : 'X';
+		const hour = this.currentData.timeCorrectionEnabled && this.currentData.bazi.zty ? this.currentData.bazi.zty.hour : this.currentData.hour;
+		const minute = this.currentData.timeCorrectionEnabled && this.currentData.bazi.zty ? this.currentData.bazi.zty.minute : this.currentData.minute;
+		const defaultTitle = `${String(this.currentData.year)}.${String(this.currentData.month).padStart(2, '0')}.${String(this.currentData.day).padStart(2, '0')}-${String(hour).padStart(2, '0')}.${String(minute).padStart(2, '0')}-${genderCode}`;
 
 		// 如果用户已输入姓名，使用姓名；否则使用排盘码
 		const title = this.currentData.name && this.currentData.name !== defaultTitle ? this.currentData.name : defaultTitle;
@@ -836,44 +841,147 @@ export class BaziView extends ItemView {
 	}
 
 	private async identifyPaiPanCodes(): Promise<void> {
-		// 获取当前活动文档
+		// 获取当前活动文档 - 使用最可靠的方法
 		const activeFile = this.app.workspace.getActiveFile();
+
 		if (!activeFile) {
-			new Notice('没有找到活动的文档');
+			// 如果连活动文件都获取不到，说明没有打开任何文档
+			new Notice('请先打开一个笔记文档');
 			return;
 		}
 
-		// 读取文档内容
-		const content = await this.app.vault.read(activeFile);
-		
-		// 识别四级标题中的排盘码和姓名
-		const headingRegex = /^(####\s+.+)$/gm;
-		const codeOnlyRegex = /^(\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}-[XY])$/;
-		const codeWithNameRegex = /^(\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}-[XY])，([\u4e00-\u9fa5a-zA-Z0-9_-]+)$/;
+		// 获取当前选中文本 - 使用多种方法确保可靠性
+		let searchText = '';
+		let hasSelection = false;
 
-		const headings = content.match(headingRegex) || [];
+		try {
+			// 方法1: 尝试通过activeEditor获取选中内容
+			const activeView = this.app.workspace.activeEditor;
+			if (activeView && activeView.editor) {
+				const selection = activeView.editor.getSelection();
+				if (selection.trim()) {
+					searchText = selection;
+					hasSelection = true;
+					new Notice('已从选中文本中识别排盘码');
+				}
+			}
+		} catch (error) {
+			// 如果获取选中文本失败，静默处理
+			console.warn('获取选中文本失败:', error);
+		}
+
+		if (!hasSelection) {
+			// 如果没有选中文本或获取失败，读取整个文档内容
+			try {
+				searchText = await this.app.vault.read(activeFile);
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				new Notice('读取文档失败: ' + errorMessage);
+				return;
+			}
+		}
+
+		// 识别排盘码和姓名
+		// 对于选中文本，使用无锚定符的正则表达式进行全局匹配
+		// 对于四级标题，使用带锚定符的精确匹配
+		const globalCodeOnlyRegex = /(\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}-[XY])/g;
+		const globalCodeWithNameRegex = /(\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}-[XY])，([\u4e00-\u9fa5a-zA-Z0-9_-]+)/g;
+
 		const results = new Map();
 
-		for (let heading of headings) {
-			// 移除标题标记####和空格
-			const headingText = heading.replace(/^####\s+/, '').trim();
-			
-			// 尝试匹配排盘码+姓名的格式
-			let match = headingText.match(codeWithNameRegex);
-			if (match) {
+		// 如果是从选中文本识别，直接扫描整个选中文本
+		if (hasSelection) {
+			// 匹配排盘码+姓名的格式
+			const nameMatches = searchText.matchAll(globalCodeWithNameRegex);
+			for (const match of nameMatches) {
 				const code = match[1];
 				const name = match[2];
-				results.set(code, name);
-				continue;
+
+				// 检查是否已存在相同的排盘码
+				if (results.has(code)) {
+					const existingName = results.get(code);
+					// 只有当新姓名为非空且不是"未命名"，且原值为"未命名"或空时，才进行替换
+					if (name && name.trim() && name !== '未命名' && (!existingName || existingName === '未命名')) {
+						results.set(code, name);
+					}
+					// 如果新旧姓名都符合条件（非空且不是"未命名"），保留最后一个
+					else if (name && name.trim() && name !== '未命名' && existingName && existingName !== '未命名') {
+						results.set(code, name); // 保留最后一个符合条件的
+					}
+				} else {
+					// 如果没有重复，直接设置
+					results.set(code, name);
+				}
 			}
 
-			// 尝试匹配纯排盘码格式
-			match = headingText.match(codeOnlyRegex);
-			if (match) {
+			// 匹配纯排盘码格式（仅排盘码，没有姓名）
+			const codeMatches = searchText.matchAll(globalCodeOnlyRegex);
+			for (const match of codeMatches) {
 				const code = match[1];
-				// 只有当这个排盘码还没有被设置过时，才添加为"未命名"
+				// 确保姓名不为空 - 仅当没有更好的记录时才设置"未命名"
 				if (!results.has(code)) {
 					results.set(code, '未命名');
+				} else {
+					// 如果已存在记录且姓名为"未命名"，检查是否需要更新
+					const existingName = results.get(code);
+					if (!existingName || existingName === '未命名') {
+						// 保留当前的"未命名"，因为新记录也是"未命名"
+						results.set(code, '未命名');
+					}
+				}
+			}
+		} else {
+			// 如果没有选中文本，则继续使用原有的四级标题识别方法
+			const headingRegex = /^(####\s+.+)$/gm;
+			const headings = searchText.match(headingRegex) || [];
+
+			for (let heading of headings) {
+				// 移除标题标记####和空格
+				const headingText = heading.replace(/^####\s+/, '').trim();
+
+				// 尝试匹配排盘码+姓名的格式，对于四级标题使用准确的锚定符匹配
+				// 注意：match()方法需要不带g标志的正则表达式
+				const codeWithNameRegex = /(\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}-[XY])，([\u4e00-\u9fa5a-zA-Z0-9_-]+)/;
+				let match = headingText.match(codeWithNameRegex);
+				if (match) {
+					const code = match[1];
+					const name = match[2];
+
+					// 检查是否已存在相同的排盘码
+					if (results.has(code)) {
+						const existingName = results.get(code);
+						// 只有当新姓名为非空且不是"未命名"，且原值为"未命名"或空时，才进行替换
+						if (name && name.trim() && name !== '未命名' && (!existingName || existingName === '未命名')) {
+							results.set(code, name);
+						}
+						// 如果新旧姓名都符合条件（非空且不是"未命名"），保留最后一个
+						else if (name && name.trim() && name !== '未命名' && existingName && existingName !== '未命名') {
+							results.set(code, name); // 保留最后一个符合条件的
+						}
+					} else {
+						// 如果没有重复，直接设置
+						results.set(code, name);
+					}
+					continue;
+				}
+
+				// 尝试匹配纯排盘码格式（仅排盘码，没有姓名）
+				// 注意：match()方法需要不带g标志的正则表达式
+				const codeOnlyRegex = /(\d{4}\.\d{2}\.\d{2}-\d{2}\.\d{2}-[XY])/;
+				match = headingText.match(codeOnlyRegex);
+				if (match) {
+					const code = match[1];
+					// 确保姓名不为空 - 仅当没有更好的记录时才设置"未命名"
+					if (!results.has(code)) {
+						results.set(code, '未命名');
+					} else {
+						// 如果已存在记录且姓名为"未命名"，检查是否需要更新
+						const existingName = results.get(code);
+						if (!existingName || existingName === '未命名') {
+							// 保留当前的"未命名"，因为新记录也是"未命名"
+							results.set(code, '未命名');
+						}
+					}
 				}
 			}
 		}
@@ -898,7 +1006,7 @@ export class BaziView extends ItemView {
 		// 解析排盘码
 		const codeRegex = /^(\d{4})\.(\d{2})\.(\d{2})-(\d{2})\.(\d{2})-(X|Y)$/;
 		const match = code.match(codeRegex);
-		
+
 		if (match && match[1] && match[2] && match[3] && match[4] && match[5] && match[6]) {
 			const year = parseInt(match[1]);
 			const month = parseInt(match[2]);
@@ -906,12 +1014,12 @@ export class BaziView extends ItemView {
 			const hour = parseInt(match[4]);
 			const minute = parseInt(match[5]);
 			const gender = match[6]; // X表示女，Y表示男
-			
+
 			// 更新currentData并触发重新渲染
 			if (!this.currentData) {
 				this.currentData = {
 					year: 0,
-					month: 0, 
+					month: 0,
 					day: 0,
 					hour: 0,
 					minute: 0,
@@ -919,42 +1027,50 @@ export class BaziView extends ItemView {
 					amOrPm: 'am',
 					gender: 0,
 					name: '',
+					tag: '',
 					bazi: {} as BaziResult,
 					solarTerms: {} as NearbySolarTerms,
 					dayun: {} as CurrentDayunData,
 					timeCorrectionEnabled: false
 				};
 			}
-			
-			this.currentData.year = year;
-			this.currentData.month = month;
-			this.currentData.day = day;
-			this.currentData.hour = hour;
-			this.currentData.minute = minute;
-			this.currentData.second = 0;
-			this.currentData.gender = gender === 'Y' ? 0 : 1; // Y表示男，X表示女
-			this.currentData.amOrPm = hour >= 0 && hour < 12 ? 'am' : 'pm';
-			
-			// 设置姓名
-			if (name && name !== '未命名') {
-				this.currentData.name = name;
-			} else {
-				this.currentData.name = '';
+
+			if (this.currentData) {
+				this.currentData.year = year;
+				this.currentData.month = month;
+				this.currentData.day = day;
+				this.currentData.hour = hour;
+				this.currentData.minute = minute;
+				this.currentData.second = 0;
+				this.currentData.gender = gender === 'Y' ? 0 : 1; // Y表示男，X表示女
+				this.currentData.amOrPm = hour >= 0 && hour < 12 ? 'am' : 'pm';
 			}
-			
+
+			// 设置姓名
+			if (this.currentData) {
+				if (name && name.trim() && name !== '未命名') {
+					this.currentData.name = name;
+				} else {
+					// 如果姓名为空或未命名，设置为"未命名"作为默认值
+					this.currentData.name = '未命名';
+				}
+			}
+
 			// 重新计算八字数据（通过调用Paipan类的计算方法）
 			this.paipan.J = parseFloat(this.plugin.settings.longitude);
 			this.paipan.W = parseFloat(this.plugin.settings.latitude);
-			this.currentData.bazi = this.paipan.fatemaps(this.currentData.gender, year, month, day, hour, minute, 0, false);
-			this.currentData.dayun = this.paipan.getCurrentDayun(year, month, day, this.currentData.gender);
-			this.currentData.solarTerms = this.paipan.getNearbySolarTerms(year, month, day);
-			
+			if (this.currentData) {
+				this.currentData.bazi = this.paipan.fatemaps(this.currentData.gender, year, month, day, hour, minute, 0, false);
+				this.currentData.dayun = this.paipan.getCurrentDayun(year, month, day, this.currentData.gender);
+				this.currentData.solarTerms = this.paipan.getNearbySolarTerms(year, month, day);
+			}
+
 			// 清除并重新渲染界面，确保结果显示
 			const container = this.containerEl.children[1] as HTMLElement;
 			if (container) {
 				container.empty();
 				this.renderContent(container);
-				
+
 				// 等待界面渲染完成后再显示排盘结果
 				setTimeout(() => {
 					this.displayResults();
@@ -969,47 +1085,47 @@ export class BaziView extends ItemView {
 	private showPaiPanSelectionModal(results: Map<string, string>): void {
 		const modal = new Modal(this.app);
 		modal.titleEl.setText('选择排盘');
-		
+
 		const contentEl = modal.contentEl;
 		contentEl.createEl('p', { text: '请选择要加载的排盘:' });
-		
+
 		const selectEl = contentEl.createEl('select', { cls: 'pai-pan-select' });
-		
+
 		// 添加一个默认选项
 		const defaultOption = selectEl.createEl('option');
 		defaultOption.value = '';
 		defaultOption.text = '请选择...';
 		defaultOption.disabled = true;
 		defaultOption.selected = true;
-		
+
 		// 添加每个排盘选项
 		results.forEach((name, code) => {
 			const option = selectEl.createEl('option');
 			option.value = code;
 			option.text = `${code}，${name}`;
 		});
-		
+
 		// 添加确认按钮
 		const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
 		const confirmBtn = buttonContainer.createEl('button', { text: '加载' });
 		const cancelBtn = buttonContainer.createEl('button', { text: '取消' });
-		
+
 		confirmBtn.addEventListener('click', () => {
 			const selectedCode = selectEl.value;
 			if (!selectedCode) {
 				new Notice('请选择一个排盘');
 				return;
 			}
-			
+
 			const name = results.get(selectedCode) || '未命名';
 			this.loadPaiPanFromCode(selectedCode, name);
 			modal.close();
 		});
-		
+
 		cancelBtn.addEventListener('click', () => {
 			modal.close();
 		});
-		
+
 		modal.open();
 	}
 }
@@ -1045,8 +1161,8 @@ class TimeSettingModal extends Modal {
 		// 选项卡
 		const tabContainer = contentEl.createEl('div');
 		tabContainer.setCssProps({
-			display: 'flex', 
-			gap: '0px', 
+			display: 'flex',
+			gap: '0px',
 			margin: '6px 0px 3px 0px'
 		});
 		const tabs = ['公历', '农历', '干支历'];
@@ -1177,6 +1293,35 @@ class TimeSettingModal extends Modal {
 		const femaleLabel = genderContainer.createEl('label', { text: '女' });
 		femaleLabel.setCssProps({ marginLeft: '5px' });
 
+		// 标签选择
+		const tagLabel = nameGenderRow.createEl('label', { text: '标签：' });
+		tagLabel.style.marginLeft = '10px';
+		
+		const tagSelect = nameGenderRow.createEl('select');
+		tagSelect.style.marginLeft = '5px';
+		tagSelect.style.marginRight = '10px';
+		tagSelect.style.border = '1px solid #ccc';
+		tagSelect.style.boxShadow = 'none';
+		
+		// 添加标签选项
+		const tagOptions = ['关注', '亲友', '名人', '古籍', '客户', '其他'];
+		
+		// 添加默认选项
+		const defaultOption = tagSelect.createEl('option');
+		defaultOption.textContent = '选择标签';
+		defaultOption.value = '';
+		
+		tagOptions.forEach(tag => {
+			const option = tagSelect.createEl('option');
+			option.textContent = tag;
+			option.value = tag;
+			
+			// 设置默认选择状态
+			if (currentData?.tag === tag) {
+				option.selected = true;
+			}
+		});
+
 		if (tabIndex === 0) { // 公历
 			this.renderGregorianTab(tabContent);
 		} else if (tabIndex === 1) { // 农历
@@ -1240,7 +1385,7 @@ class TimeSettingModal extends Modal {
 			provinceSelect.disabled = !isEnabled;
 			citySelect.disabled = !isEnabled;
 			districtSelect.disabled = !isEnabled;
-			
+
 			// 更新样式以反映禁用状态
 			if (!isEnabled) {
 				provinceSelect.style.backgroundColor = '#f5f5f5';
@@ -1249,7 +1394,7 @@ class TimeSettingModal extends Modal {
 				citySelect.style.color = '#888';
 				districtSelect.style.backgroundColor = '#f5f5f5';
 				districtSelect.style.color = '#888';
-				
+
 				// 清空值
 				provinceSelect.innerHTML = '';
 				provinceSelect.value = '';
@@ -1269,34 +1414,34 @@ class TimeSettingModal extends Modal {
 				const emptyProvinceOption = provinceSelect.createEl('option');
 				emptyProvinceOption.textContent = '选择省份';
 				emptyProvinceOption.value = '';
-                    
+
 				PROVINCE_CITY_DISTRICT_GROUPS.forEach(group => {
 					provinceSelect.createEl('option', { text: group.province.name, value: group.province.name });
 				});
-				
+
 				// 根据当前设置重新初始化
 				const currentCity = this.view.plugin.settings.city || '杭州';
 				let initialProvinceName = '';
 				let initialCityName = currentCity;
 				let initialDistrictName = '';
-				
+
 				// 查找当前城市对应的省份和区县
 				outer: for (const group of PROVINCE_CITY_DISTRICT_GROUPS) {
 					for (const city of group.cities) {
 						if (city.name === currentCity) {
 							initialProvinceName = group.province.name;
-							
+
 							// 查找对应的区县数据
 							const districts = group.districts.get(city.id);
 							if (districts && districts.length > 0 && districts[0]) {
-							// 假设使用第一个区县作为默认值
-							initialDistrictName = districts[0].name;
-						}
+								// 假设使用第一个区县作为默认值
+								initialDistrictName = districts[0].name;
+							}
 							break outer;
 						}
 					}
 				}
-                        
+
 				// 三级联动更新函数定义
 				const updateCityAndDistrictSelect = (provinceName: string) => {
 					// 清空城市和区县下拉框
@@ -1307,7 +1452,7 @@ class TimeSettingModal extends Modal {
 					const emptyCityOption = citySelect.createEl('option');
 					emptyCityOption.textContent = '选择地级市';
 					emptyCityOption.value = '';
-                    
+
 					const emptyDistrictOption = districtSelect.createEl('option');
 					emptyDistrictOption.textContent = '选择区县';
 					emptyDistrictOption.value = '';
@@ -1346,16 +1491,16 @@ class TimeSettingModal extends Modal {
 						}
 					}
 				};
-				
+
 				// 设置初始值
 				if (initialProvinceName) {
 					provinceSelect.value = initialProvinceName;
 					updateCityAndDistrictSelect(initialProvinceName);
-                    
+
 					if (initialCityName) {
 						citySelect.value = initialCityName;
 						updateDistrictSelect(initialCityName);
-                           
+
 						if (initialDistrictName) {
 							districtSelect.value = initialDistrictName;
 						}
@@ -1371,7 +1516,7 @@ class TimeSettingModal extends Modal {
 					emptyDistrictOption.textContent = '选择区县';
 					emptyDistrictOption.value = '';
 				};
-                    
+
 				citySelect.onchange = () => {
 					updateDistrictSelect(citySelect.value);
 				};
@@ -1416,7 +1561,7 @@ class TimeSettingModal extends Modal {
 			const selectedDistrict = (districtSelect as HTMLSelectElement).value;
 			let selectedCityName = (citySelect as HTMLSelectElement).value;
 			let selectedProvinceName = (provinceSelect as HTMLSelectElement).value;
-			
+
 			// 使用三级联动的完整地理信息
 			const locationData = this.findLocationInGroups(selectedDistrict, selectedCityName, selectedProvinceName);
 			if (locationData) {
@@ -1442,21 +1587,29 @@ class TimeSettingModal extends Modal {
 				}
 			}
 
-			if (tabIndex === 0) {
-				// 公历
-				const selects = tabContent.querySelectorAll('select');
-				// 性别选择是input元素，不是select元素，所以selects[0]就是年选择
-				year = parseInt((selects[0] as HTMLSelectElement).value);
-				month = parseInt((selects[1] as HTMLSelectElement).value);
-				day = parseInt((selects[2] as HTMLSelectElement).value);
-				hour = parseInt((selects[3] as HTMLSelectElement).value);
-				minute = parseInt((selects[4] as HTMLSelectElement).value);
-				// 使用当前盘面的秒级信息
-				second = this.view.currentData?.second ?? new Date().getSeconds();
+		if (tabIndex === 0) {
+			// 公历
+			const timeContainer = tabContent.querySelector('.bazi-time-selectors');
+			if (!timeContainer) {
+				new Notice('无法找到时间选择器容器');
+				return;
+			}
+			const selects = timeContainer.querySelectorAll('select');
+			year = parseInt((selects[0] as HTMLSelectElement).value);
+			month = parseInt((selects[1] as HTMLSelectElement).value);
+			day = parseInt((selects[2] as HTMLSelectElement).value);
+			hour = parseInt((selects[3] as HTMLSelectElement).value);
+			minute = parseInt((selects[4] as HTMLSelectElement).value);
+			// 使用当前盘面的秒级信息
+			second = this.view.currentData?.second ?? new Date().getSeconds();
 			} else if (tabIndex === 1) {
 				// 农历 - 需要转换
-				const selects = tabContent.querySelectorAll('select');
-				// 性别选择是input元素，不是select元素，所以selects[0]就是年选择
+				const timeContainer = tabContent.querySelector('.bazi-time-selectors');
+				if (!timeContainer) {
+					new Notice('无法找到时间选择器容器');
+					return;
+				}
+				const selects = timeContainer.querySelectorAll('select');
 				const lunarYear = parseInt((selects[0] as HTMLSelectElement).value);
 				const monthValue = parseInt((selects[1] as HTMLSelectElement).value);
 				// 判断是否为闰月（大于12的值表示闰月）
@@ -1488,15 +1641,16 @@ class TimeSettingModal extends Modal {
 				second = this.selectedSecond || 0;
 			}
 
-			// 获取姓名信息和时间校准状态
+			// 获取姓名信息、标签和时间校准状态
 			const name = (nameInput as HTMLInputElement).value || '案例';
+			const tag = (tagSelect as HTMLSelectElement).value;
 			const timeCorrectionEnabled = timeCorrectionCheckbox.checked;
-			this.view.calculateAndDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled);
+			this.view.calculateAndDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled, tag);
 			this.close();
 		});
 	}
 
-	renderGregorianTab(container: Element) {
+		renderGregorianTab(container: Element) {
 		const now = new Date();
 		const currentData = this.view.currentData;
 		const currentYear = currentData?.year ?? now.getFullYear();
@@ -1507,6 +1661,7 @@ class TimeSettingModal extends Modal {
 
 		// 创建时间选择容器，所有下拉列表在同一行
 		const timeRow = container.createEl('div');
+		timeRow.addClass('bazi-time-selectors');
 		timeRow.style.display = 'flex';
 		timeRow.style.gap = '0px';
 		timeRow.style.alignItems = 'center';   // 关键：容器控制子元素垂直居中
@@ -1582,6 +1737,7 @@ class TimeSettingModal extends Modal {
 
 		// 创建时间选择容器，所有下拉列表在同一行
 		const timeRow = container.createEl('div');
+		timeRow.addClass('bazi-time-selectors');
 		timeRow.style.display = 'flex';
 		timeRow.style.gap = '0px';
 		timeRow.style.alignItems = 'center';   // 关键：容器控制子元素垂直居中
@@ -2048,7 +2204,7 @@ class TimeSettingModal extends Modal {
 	 */
 	findLocationInGroups(districtName: string, cityName: string, provinceName: string): { longitude: number; latitude: number; } | null {
 		if (!districtName || !cityName || !provinceName) return null;
-		
+
 		// 遍历省份-城市-区县数据
 		for (const group of PROVINCE_CITY_DISTRICT_GROUPS) {
 			if (group.province.name === provinceName) {
@@ -2069,7 +2225,7 @@ class TimeSettingModal extends Modal {
 				}
 			}
 		}
-		
+
 		return null;
 	}
 

@@ -117,7 +117,9 @@ export default class ZipingPlugin extends Plugin {
 		lines.push('---');
 		lines.push(`title: "${title || '案例'}"`);
 		lines.push(`author: ""`);
-		lines.push('tags: [八字/命例]');
+		const tagValue = data.tag || '';
+		const tagString = tagValue ? `八字/命例/${tagValue}` : '八字/命例';
+		lines.push(`tags: [${tagString}]`);
 		lines.push(`created: ${formatDateTime(now)}`);
 		lines.push(`modified: ${formatDateTime(now)}`);
 		lines.push(`aliases: []`);
