@@ -3,6 +3,7 @@ import {DEFAULT_SETTINGS, ZipingSettings, ZipingSettingTab} from "./settings";
 import { BaziView } from './ui/BaziView-simplified';
 import { PAIPAN_VIEW_TYPE } from './models/types';
 import { Paipan } from './Paipan';
+import { initializeStyleUtils } from './utils/styleUtils';
 
 // 导入排盘引擎以初始化 window.p
 require('./paipan.js');
@@ -12,6 +13,9 @@ export default class ZipingPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+
+		// 初始化样式工具（style-mod替代setCssProps）
+		initializeStyleUtils();
 
 		// 注册侧边栏视图
 		this.registerView(PAIPAN_VIEW_TYPE, (leaf) => new BaziView(leaf, this));

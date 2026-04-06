@@ -34,16 +34,12 @@ export class TimeSettingModal extends Modal {
 
         // 选项卡
         const tabContainer = contentEl.createEl('div');
-        tabContainer.setCssProps({
-            display: 'flex',
-            gap: '0px',
-            margin: '6px 0px 3px 0px'
-        });
+        tabContainer.addClass('ziping-flex', 'ziping-gap-0', 'ziping-margin-6-0-3-0');
         const tabs = ['公历', '农历', '干支历'];
         let activeTab = 0;
 
         const tabButtons = tabContainer.createEl('div');
-        tabButtons.setCssProps({ display: 'flex', marginBottom: '10px' });
+        tabButtons.addClass('ziping-flex', 'ziping-margin-bottom-10');
         const tabButtonElements: HTMLButtonElement[] = [];
         tabs.forEach((tab, index) => {
             const btn = tabButtons.createEl('button', { text: tab });
@@ -58,15 +54,11 @@ export class TimeSettingModal extends Modal {
                 // 更新所有按钮的样式
                 tabButtonElements.forEach((button, i) => {
                     if (i === index) {
-                        button.setCssProps({
-                            backgroundColor: 'var(--background-secondary)',
-                            color: 'var(--interactive-accent)',
-                        });
+                        button.classList.remove('ziping-button-inactive');
+                        button.classList.add('ziping-button-active');
                     } else {
-                        button.setCssProps({
-                            backgroundColor: '#f1f1f1',
-                            color: 'black',
-                        });
+                        button.classList.remove('ziping-button-active');
+                        button.classList.add('ziping-button-inactive');
                     }
                 });
                 this.renderTabContent(contentEl, activeTab);
@@ -74,10 +66,7 @@ export class TimeSettingModal extends Modal {
         });
         // 初始化第一个按钮为选中状态
         if (tabButtonElements.length > 0 && tabButtonElements[0]) {
-            tabButtonElements[0].setCssProps({
-                backgroundColor: 'var(--background-secondary)',
-                color: 'var(--interactive-accent)',
-            });
+            tabButtonElements[0].classList.add('ziping-button-active');
         }
 
         this.renderTabContent(contentEl, activeTab);
@@ -163,7 +152,7 @@ export class TimeSettingModal extends Modal {
         // 设置默认选择状态
         femaleRadio.checked = currentData?.gender === 1;
         const femaleLabel = genderContainer.createEl('label', { text: '女' });
-        femaleLabel.setCssProps({ marginLeft: '5px' });
+        femaleLabel.addClass('ziping-margin-left-5');
 
         // 标签选择
         const tagLabel = nameGenderRow.createEl('label', { text: '标签：' });
@@ -406,12 +395,7 @@ export class TimeSettingModal extends Modal {
 
         // 按钮
         const buttonContainer = tabContent.createEl('div');
-        buttonContainer.setCssProps({
-            display: 'flex',
-            gap: '10px',
-            justifyContent: 'flex-end',
-            marginTop: '20px'
-        });
+        buttonContainer.addClass('ziping-flex', 'ziping-flex-end', 'ziping-gap-10', 'ziping-margin-top-20');
 
         const cancelBtn = buttonContainer.createEl('button', { text: '取消' });
         cancelBtn.addEventListener('click', () => {
@@ -544,7 +528,7 @@ export class TimeSettingModal extends Modal {
 
         // 年
         const yearSelect = timeRow.createEl('select');
-        yearSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+        yearSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
         for (let y = 1600; y <= 2100; y++) {
             yearSelect.createEl('option', { text: y.toString(), value: y.toString() });
         }
@@ -552,7 +536,7 @@ export class TimeSettingModal extends Modal {
 
         // 月
         const monthSelect = timeRow.createEl('select');
-        monthSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+        monthSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
         for (let m = 1; m <= 12; m++) {
             monthSelect.createEl('option', { text: m.toString(), value: m.toString() });
         }
@@ -560,7 +544,7 @@ export class TimeSettingModal extends Modal {
 
         // 日
         const daySelect = timeRow.createEl('select');
-        daySelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+        daySelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
         for (let d = 1; d <= 31; d++) {
             daySelect.createEl('option', { text: d.toString(), value: d.toString() });
         }
@@ -568,7 +552,7 @@ export class TimeSettingModal extends Modal {
 
         // 时
         const hourSelect = timeRow.createEl('select');
-        hourSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+        hourSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
         for (let h = 0; h < 24; h++) {
             hourSelect.createEl('option', { text: h.toString(), value: h.toString() });
         }
@@ -576,7 +560,7 @@ export class TimeSettingModal extends Modal {
 
         // 分
         const minuteSelect = timeRow.createEl('select');
-        minuteSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0' });
+        minuteSelect.addClass('ziping-select-style');
         for (let m = 0; m < 60; m++) {
             minuteSelect.createEl('option', { text: m.toString(), value: m.toString() });
         }
@@ -622,7 +606,7 @@ export class TimeSettingModal extends Modal {
 
         // 年
         const yearSelect = timeRow.createEl('select');
-        yearSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+        yearSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
         for (let y = 1900; y <= 2100; y++) {
             yearSelect.createEl('option', { text: y.toString(), value: y.toString() });
         }
@@ -630,7 +614,7 @@ export class TimeSettingModal extends Modal {
 
         // 月
         const monthSelect = timeRow.createEl('select');
-        monthSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+        monthSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
 
         // 根据年份获取月份列表，包括闰月
         const updateMonthOptions = (year: number) => {
@@ -673,7 +657,7 @@ export class TimeSettingModal extends Modal {
 
         // 日
         const daySelect = timeRow.createEl('select');
-        daySelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+        daySelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
         const dayNames = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
             '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
             '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
@@ -684,7 +668,7 @@ export class TimeSettingModal extends Modal {
 
         // 时
         const hourSelect = timeRow.createEl('select');
-        hourSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0', borderRight: 'none' });
+        hourSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
         for (let h = 0; h < 24; h++) {
             hourSelect.createEl('option', { text: h.toString(), value: h.toString() });
         }
@@ -692,7 +676,7 @@ export class TimeSettingModal extends Modal {
 
         // 分
         const minuteSelect = timeRow.createEl('select');
-        minuteSelect.setCssProps({ padding: '5px', border: '1px solid #ccc', borderRadius: '0' });
+        minuteSelect.addClass('ziping-select-style');
         for (let m = 0; m < 60; m++) {
             minuteSelect.createEl('option', { text: m.toString(), value: m.toString() });
         }
@@ -737,7 +721,7 @@ export class TimeSettingModal extends Modal {
 
         // 第一排：天干下拉列表
         const ganRow = container.createEl('div');
-        ganRow.setCssProps({ display: 'flex', gap: '10px', marginBottom: '10px' });
+        ganRow.addClass('ziping-flex-gap-10-mb-10');
 
         // 年柱天干
         const yearGanSelect = ganRow.createEl('select');
@@ -777,7 +761,7 @@ export class TimeSettingModal extends Modal {
 
         // 第二排：地支下拉列表
         const zhiRow = container.createEl('div');
-        zhiRow.setCssProps({ display: 'flex', gap: '10px' });
+        zhiRow.addClass('ziping-flex', 'ziping-gap-10');
 
         // 年柱地支
         const yearZhiSelect = zhiRow.createEl('select');
@@ -959,19 +943,13 @@ export class TimeSettingModal extends Modal {
             text: '筛选匹配干支历的时间',
             cls: 'mod-cta'
         });
-        filterButton.setCssProps({ marginTop: '20px', marginBottom: '10px' });
+        filterButton.addClass('ziping-margin-top-20', 'ziping-margin-bottom-10');
 
         // 创建结果展示区域
         const resultContainer = container.createEl('div', {
             cls: 'bazi-filter-result'
         });
-        resultContainer.setCssProps({
-            marginTop: '5px',
-            border: '1px solid #ddd',
-            borderRadius: '5px',
-            maxHeight: '300px',
-            overflowY: 'auto'
-        });
+        resultContainer.addClass('ziping-margin-top-5', 'ziping-border-1-ddd', 'ziping-border-radius-5', 'ziping-max-height-300', 'ziping-overflow-y-auto');
 
         // 筛选按钮点击事件
         filterButton.addEventListener('click', () => {
@@ -1012,19 +990,12 @@ export class TimeSettingModal extends Modal {
                     } else {
                         // 创建结果列表
                         const resultList = resultContainer.createEl('ul');
-                        resultList.setCssProps({
-                            listStyleType: 'none',
-                            padding: '0',
-                            margin: '0'
-                        });
+                        resultList.addClass('ziping-list-style-none', 'ziping-padding-0', 'ziping-margin-0');
 
                         // 添加每个结果
                         results.forEach(result => {
                             const listItem = resultList.createEl('li');
-                            listItem.setCssProps({
-                                padding: '8px 0',
-                                borderBottom: '1px solid #eee'
-                            });
+                            listItem.addClass('ziping-list-item-padding');
 
                             // 格式化日期时间为YYYY.MM.DD-HH.00
                             const formattedDate = `${String(result.year).padStart(4, '0')}.${String(result.month).padStart(2, '0')}.${String(result.day).padStart(2, '0')}-${String(result.hour).padStart(2, '0')}.00`;
@@ -1046,10 +1017,7 @@ export class TimeSettingModal extends Modal {
                             });
 
                             // 添加悬停效果
-                            listItem.setCssProps({
-                                cursor: 'pointer',
-                                transition: 'background-color 0.2s'
-                            });
+                            listItem.addClass('ziping-transition-bg');
 
                             listItem.addEventListener('mouseenter', () => {
                                 listItem.style.backgroundColor = '#f0f0f0';

@@ -10,7 +10,6 @@ import { TimeSettingModal } from './TimeSettingModal';
 import { BaziTable } from './components/BaziTable';
 import { DayunDisplay } from './components/DayunDisplay';
 import { ResultDisplay } from './components/ResultDisplay';
-import { FourPillarsFilterView } from './FourPillarsFilterView';
 import { CurrentBaziData } from '../models/types';
 import ZipingPlugin from '../main';
 

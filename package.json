@@ -27,6 +27,7 @@
 		"html2canvas": "npm:html2canvas-pro@^2.0.2",
 		"html2canvas-pro": "^2.0.2",
 		"modern-screenshot": "^4.6.8",
-		"obsidian": "latest"
+		"obsidian": "latest",
+		"style-mod": "^4.1.3"
 	}
 }

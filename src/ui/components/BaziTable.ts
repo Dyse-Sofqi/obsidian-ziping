@@ -19,11 +19,7 @@ export class BaziTable {
 
         const table = container.createEl('table');
         table.addClass('bazi-table');
-        table.setCssProps({
-            width: '100%',
-            borderCollapse: 'collapse',
-            marginTop: '5px'
-        });
+        table.addClass('ziping-table-style');
 
         // 判断是否是小运模式
         const isXiaoyunMode = data.selectedDayunIndex === -1;
@@ -75,11 +71,7 @@ export class BaziTable {
         ['时间', '年柱', '月柱', '日柱', '时柱', dayunHeaderTitle, '流年'].forEach(title => {
             const th = headerRow.createEl('th');
             th.setText(title);
-            th.setCssProps({
-                border: '1px solid #ccc',
-                padding: '6px 8px',
-                backgroundColor: '#f5f5f5'
-            });
+            th.addClass('ziping-table-header');
         });
 
         // 第二行：十神关系
@@ -104,7 +96,7 @@ export class BaziTable {
         ].forEach(text => {
             const td = shishenRow.createEl('td');
             td.setText(text);
-            td.setCssProps({ border: '1px solid #ccc', padding: '6px 8px', textAlign: 'center' });
+            td.addClass('ziping-table-cell');
         });
 
         // 后续数据行
@@ -138,10 +130,10 @@ export class BaziTable {
             const row = table.createEl('tr');
             const first = row.createEl('td');
             first.setText(rowData.label);
-            first.setCssProps({ padding: '6px 8px', fontWeight: 'bold', textAlign: 'center' });
+            first.addClass('ziping-table-cell-bold');
             rowData.values.forEach((val, idx) => {
                 const td = row.createEl('td');
-                td.setCssProps({ padding: '6px 8px', textAlign: 'center' });
+                td.addClass('ziping-table-cell');
 
                 if (rowData.isCangQi) {
                     if (val.gan) {
@@ -149,7 +141,7 @@ export class BaziTable {
                         ganSpan.setText(val.gan);
                         if (val.wuxing) {
                             ganSpan.addClass('c-' + val.wuxing);
-                            ganSpan.setCssProps({ fontWeight: '600' });
+                            ganSpan.addClass('ziping-font-weight-600');
                         }
                     }
                     if (val.shishen) {
@@ -159,7 +151,7 @@ export class BaziTable {
                 } else if (rowData.isXunKong) {
                     td.setText(val.text || '');
                     if (idx === 2) {
-                        td.setCssProps({ fontWeight: 'bold' });
+                        td.addClass('ziping-font-bold');
                     }
                 } else {
                     td.setText(val.text || '');
