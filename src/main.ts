@@ -1,6 +1,7 @@
 import {App, Notice, Plugin, WorkspaceLeaf} from 'obsidian';
 import {DEFAULT_SETTINGS, ZipingSettings, ZipingSettingTab} from "./settings";
-import { BaziView, PAIPAN_VIEW_TYPE } from './BaziView';
+import { BaziView } from './ui/BaziView-simplified';
+import { PAIPAN_VIEW_TYPE } from './models/types';
 import { Paipan } from './Paipan';
 
 // 导入排盘引擎以初始化 window.p
