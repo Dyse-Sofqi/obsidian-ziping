@@ -6,7 +6,6 @@ import { findLocationInGroups } from '../utils/locationUtils';
 
 export class TimeSettingModal extends Modal {
     view: BaziView;
-
     // 存储选中的时间值
     selectedYear: number;
     selectedMonth: number;
@@ -18,7 +17,6 @@ export class TimeSettingModal extends Modal {
     constructor(app: App, view: BaziView) {
         super(app);
         this.view = view;
-
         // 初始化时间值
         this.selectedYear = 0;
         this.selectedMonth = 0;
@@ -30,25 +28,21 @@ export class TimeSettingModal extends Modal {
 
     onOpen() {
         const { contentEl } = this;
-        contentEl.setText('设置时间');
-
         // 选项卡
         const tabContainer = contentEl.createEl('div');
-        tabContainer.addClass('ziping-flex', 'ziping-gap-0', 'ziping-margin-6-0-3-0');
+        tabContainer.addClass('ziping-flex-align-center');
+        tabContainer.createEl('span', { text: '历法：' });
         const tabs = ['公历', '农历', '干支历'];
         let activeTab = 0;
 
         const tabButtons = tabContainer.createEl('div');
-        tabButtons.addClass('ziping-flex', 'ziping-margin-bottom-10');
+        tabButtons.addClass('ziping-flex');
         const tabButtonElements: HTMLButtonElement[] = [];
         tabs.forEach((tab, index) => {
             const btn = tabButtons.createEl('button', { text: tab });
             tabButtonElements.push(btn);
             // 设置按钮基础样式
-            btn.style.borderRadius = '0px';
-            btn.style.outline = '1px solid #ccc';
-            btn.style.boxShadow = 'none';
-            btn.style.backgroundColor = '#f1f1f1';
+            btn.classList.add('ziping-border-radius-0', 'ziping-boxShadow-none', 'ziping-button-inactive');
             btn.addEventListener('click', () => {
                 activeTab = index;
                 // 更新所有按钮的样式
@@ -85,30 +79,19 @@ export class TimeSettingModal extends Modal {
 
         // 姓名和性别在同一行
         const nameGenderRow = tabContent.createEl('div');
-        nameGenderRow.style.display = 'flex';
-        nameGenderRow.style.gap = '0px';
-        nameGenderRow.style.alignItems = 'center';
-        nameGenderRow.style.margin = '3px 0px 3px 0px';
+        nameGenderRow.addClass('bazi-name-gender-row');
+        nameGenderRow.createEl('label', { text: '姓名：' });
 
-        // 姓名输入
-        const nameLabel = nameGenderRow.createEl('label', { text: '姓名：' });
-
-        // 生成排盘码作为默认值
-        let defaultName = '案例';
-        if (currentData && currentData.name && currentData.name !== '案例') {
+        let defaultName = '未命名';
+        if (currentData && currentData.name && currentData.name !== '未命名') {
             // 如果当前已有有效姓名，则使用当前姓名
             defaultName = currentData.name;
-        } else if (currentData) {
-            // 如果没有有效姓名，则生成排盘码
-            const genderCode = currentData.gender === 0 ? 'Y' : 'X';
-            defaultName = `${String(currentData.year)}.${String(currentData.month).padStart(2, '0')}.${String(currentData.day).padStart(2, '0')}-${String(currentData.hour).padStart(2, '0')}.${String(currentData.minute).padStart(2, '0')}-${genderCode}`;
         }
-
         const nameInput = nameGenderRow.createEl('input', {
             type: 'text',
             value: defaultName
         });
-        nameInput.style.marginRight = '10px';
+        nameInput.classList.add('ziping-margin-right-10');
 
         // 点击后自动清除默认文本
         nameInput.addEventListener('focus', () => {
@@ -125,12 +108,8 @@ export class TimeSettingModal extends Modal {
         });
 
         // 性别选择
-        const genderLabel = nameGenderRow.createEl('label', { text: '性别：' });
+        nameGenderRow.createEl('label', { text: '性别：' });
         const genderContainer = nameGenderRow.createEl('div');
-        genderContainer.style.display = 'flex';
-        genderContainer.style.gap = '0px';
-        genderContainer.style.alignItems = 'center';
-        genderContainer.style.margin = '3px 0px 3px 0px';
 
         // 男单选按钮
         const maleRadio = genderContainer.createEl('input', {
@@ -141,7 +120,7 @@ export class TimeSettingModal extends Modal {
         // 设置默认选择状态
         maleRadio.checked = currentData?.gender === 0;
         const maleLabel = genderContainer.createEl('label', { text: '男' });
-        maleLabel.style.marginRight = '10px';
+        maleLabel.classList.add('ziping-margin-right-10');
 
         // 女单选按钮
         const femaleRadio = genderContainer.createEl('input', {
@@ -151,32 +130,26 @@ export class TimeSettingModal extends Modal {
         femaleRadio.setAttribute('name', 'gender');
         // 设置默认选择状态
         femaleRadio.checked = currentData?.gender === 1;
-        const femaleLabel = genderContainer.createEl('label', { text: '女' });
-        femaleLabel.addClass('ziping-margin-left-5');
+        genderContainer.createEl('label', { text: '女' });
 
         // 标签选择
         const tagLabel = nameGenderRow.createEl('label', { text: '标签：' });
-        tagLabel.style.marginLeft = '10px';
-        
+        tagLabel.classList.add('ziping-margin-left-10');
+
         const tagSelect = nameGenderRow.createEl('select');
-        tagSelect.style.marginLeft = '5px';
-        tagSelect.style.marginRight = '10px';
-        tagSelect.style.border = '1px solid #ccc';
-        tagSelect.style.boxShadow = 'none';
-        
+        tagSelect.classList.add('margin-left-10', 'margin-right-10', 'ziping-border-1-ccc', 'ziping-boxShadow-none');
+
         // 添加标签选项
         const tagOptions = ['关注', '亲友', '名人', '古籍', '客户', '其他'];
-        
-        // 添加默认选项
         const defaultOption = tagSelect.createEl('option');
-        defaultOption.textContent = '选择标签';
+        defaultOption.textContent = '默认';
         defaultOption.value = '';
-        
+
         tagOptions.forEach(tag => {
             const option = tagSelect.createEl('option');
             option.textContent = tag;
             option.value = tag;
-            
+
             // 设置默认选择状态
             if (currentData?.tag === tag) {
                 option.selected = true;
@@ -193,52 +166,38 @@ export class TimeSettingModal extends Modal {
 
         // 校时复选框
         const timeCorrectionContainer = tabContent.createEl('div');
-        timeCorrectionContainer.style.display = 'flex';
-        timeCorrectionContainer.style.gap = '0px';
-        timeCorrectionContainer.style.alignItems = 'center';
-        timeCorrectionContainer.style.margin = '3px 0px 3px 0px';
-
+        timeCorrectionContainer.addClass('ziping-flex-gap-0-mb-6-0-6-0');
+        const timeCorrectionLabel = timeCorrectionContainer.createEl('label', { text: '校时' });
+        timeCorrectionLabel.htmlFor = 'time-correction-checkbox';
         const timeCorrectionCheckbox = timeCorrectionContainer.createEl('input', {
             type: 'checkbox'
         });
         timeCorrectionCheckbox.id = 'time-correction-checkbox';
-        const timeCorrectionLabel = timeCorrectionContainer.createEl('label', { text: '校时' });
-        timeCorrectionLabel.htmlFor = 'time-correction-checkbox';
-        timeCorrectionLabel.style.marginLeft = '5px';
 
         // 城市选择 - 省市区三级联动
         const cityContainer = tabContent.createEl('div');
-        cityContainer.style.display = 'flex';
-        cityContainer.style.gap = '0px';
-        cityContainer.style.alignItems = 'center';
-        cityContainer.style.margin = '3px 0px 3px 0px';
-        cityContainer.style.flexWrap = 'wrap'; // 允许换行以适应三个下拉框
+        cityContainer.addClass('ziping-flex-gap-0-mb-6-0-6-0', 'ziping-flex-wrap');
 
         // 省份选择
         const provinceLabel = cityContainer.createEl('span');
-        provinceLabel.setText('省份：');
+        provinceLabel.setText('省：');
         const provinceSelect = cityContainer.createEl('select');
         provinceSelect.id = 'province-select';
-        provinceSelect.style.marginRight = '10px';
-        provinceSelect.style.border = '1px solid #ccc';
-        provinceSelect.style.boxShadow = 'none';
+        provinceSelect.classList.add('ziping-margin-right-10', 'ziping-border-1-ccc', 'ziping-boxShadow-none');
 
         // 地级市选择
         const cityLabel = cityContainer.createEl('span');
-        cityLabel.setText('地级市：');
+        cityLabel.setText('市：');
         const citySelect = cityContainer.createEl('select');
         citySelect.id = 'city-select';
-        citySelect.style.marginRight = '10px';
-        citySelect.style.border = '1px solid #ccc';
-        citySelect.style.boxShadow = 'none';
+        citySelect.classList.add('ziping-margin-right-10', 'ziping-border-1-ccc', 'ziping-boxShadow-none');
 
         // 区县选择
         const districtLabel = cityContainer.createEl('span');
-        districtLabel.setText('区县：');
+        districtLabel.setText('区：');
         const districtSelect = cityContainer.createEl('select');
         districtSelect.id = 'district-select';
-        districtSelect.style.border = '1px solid #ccc';
-        districtSelect.style.boxShadow = 'none';
+        districtSelect.classList.add('ziping-border-1-ccc', 'ziping-boxShadow-none');
 
         // 管理时间校正状态函数
         const manageTimeCorrectionState = (isEnabled: boolean) => {
@@ -249,13 +208,9 @@ export class TimeSettingModal extends Modal {
 
             // 更新样式以反映禁用状态
             if (!isEnabled) {
-                provinceSelect.style.backgroundColor = '#f5f5f5';
-                provinceSelect.style.color = '#888';
-                citySelect.style.backgroundColor = '#f5f5f5';
-                citySelect.style.color = '#888';
-                districtSelect.style.backgroundColor = '#f5f5f5';
-                districtSelect.style.color = '#888';
-
+                provinceSelect.removeClass('ziping-isDisabled-select');
+                citySelect.removeClass('ziping-isDisabled-select');
+                districtSelect.removeClass('ziping-isDisabled-select');
                 // 清空值
                 provinceSelect.innerHTML = '';
                 provinceSelect.value = '';
@@ -264,16 +219,13 @@ export class TimeSettingModal extends Modal {
                 districtSelect.innerHTML = '';
                 districtSelect.value = '';
             } else {
-                provinceSelect.style.backgroundColor = '';
-                provinceSelect.style.color = '';
-                citySelect.style.backgroundColor = '';
-                citySelect.style.color = '';
-                districtSelect.style.backgroundColor = '';
-                districtSelect.style.color = '';
+                provinceSelect.addClass('ziping-isDisabled-select');
+                citySelect.addClass('ziping-isDisabled-select');
+                districtSelect.addClass('ziping-isDisabled-select');
 
                 // 重新填充省份选择器（三级联动）
                 const emptyProvinceOption = provinceSelect.createEl('option');
-                emptyProvinceOption.textContent = '选择省份';
+                emptyProvinceOption.textContent = '省份';
                 emptyProvinceOption.value = '';
 
                 PROVINCE_CITY_DISTRICT_GROUPS.forEach(group => {
@@ -281,7 +233,7 @@ export class TimeSettingModal extends Modal {
                 });
 
                 // 根据当前设置重新初始化
-                const currentCity = this.view.plugin.settings.city || '杭州';
+                const currentCity = '';
                 let initialProvinceName = '';
                 let initialCityName = currentCity;
                 let initialDistrictName = '';
@@ -311,11 +263,11 @@ export class TimeSettingModal extends Modal {
 
                     // 添加初始选项
                     const emptyCityOption = citySelect.createEl('option');
-                    emptyCityOption.textContent = '选择地级市';
+                    emptyCityOption.textContent = '地级市';
                     emptyCityOption.value = '';
 
                     const emptyDistrictOption = districtSelect.createEl('option');
-                    emptyDistrictOption.textContent = '选择区县';
+                    emptyDistrictOption.textContent = '区县';
                     emptyDistrictOption.value = '';
 
                     // 找到对应省份的数据
@@ -334,7 +286,7 @@ export class TimeSettingModal extends Modal {
 
                     // 添加初始选项
                     const emptyDistrictOption = districtSelect.createEl('option');
-                    emptyDistrictOption.textContent = '选择区县';
+                    emptyDistrictOption.textContent = '区县';
                     emptyDistrictOption.value = '';
 
                     // 找到对应城市的数据
@@ -374,7 +326,7 @@ export class TimeSettingModal extends Modal {
                     updateCityAndDistrictSelect(provinceSelect.value);
                     districtSelect.innerHTML = '';
                     const emptyDistrictOption = districtSelect.createEl('option');
-                    emptyDistrictOption.textContent = '选择区县';
+                    emptyDistrictOption.textContent = '区县';
                     emptyDistrictOption.value = '';
                 };
 
@@ -414,33 +366,69 @@ export class TimeSettingModal extends Modal {
             const gender = parseInt(maleRadio.checked ? '0' : '1');
 
             // 获取选择的区县并更新设置（三级联动）
-            const selectedDistrict = (districtSelect as HTMLSelectElement).value;
-            let selectedCityName = (citySelect as HTMLSelectElement).value;
-            let selectedProvinceName = (provinceSelect as HTMLSelectElement).value;
+            const selectedDistrict = districtSelect.value;
+            let selectedCityName = citySelect.value;
+            let selectedProvinceName = provinceSelect.value;
 
+            // 保存省市区信息和经纬度
+            let longitude: number | undefined;
+            let latitude: number | undefined;
+            
+            // 记录当前地理位置选择
+            console.debug('用户选择的地理位置:', { 
+                省份: selectedProvinceName, 
+                城市: selectedCityName, 
+                区县: selectedDistrict 
+            });
+            
             // 使用三级联动的完整地理信息
             const locationData = findLocationInGroups(selectedDistrict, selectedCityName, selectedProvinceName);
             if (locationData) {
-                const cityDisplayName = selectedCityName || selectedDistrict;
-                this.view.plugin.settings.city = cityDisplayName;
-                this.view.plugin.settings.longitude = locationData.longitude.toString();
-                this.view.plugin.settings.latitude = locationData.latitude.toString();
                 // 更新排盘引擎的经纬度
                 this.view.paipan.J = locationData.longitude;
                 this.view.paipan.W = locationData.latitude;
+                longitude = locationData.longitude;
+                latitude = locationData.latitude;
+                console.debug('经纬度设置成功:', { 
+                    经度: locationData.longitude, 
+                    纬度: locationData.latitude 
+                });
                 void this.view.plugin.saveSettings();
-            } else if (selectedCityName) {
-                // 如果无法找到区县数据，回退到城市数据
-                const cityData = CITIES.find(c => c.name === selectedCityName);
-                if (cityData) {
-                    this.view.plugin.settings.city = selectedCityName;
-                    this.view.plugin.settings.longitude = cityData.longitude.toString();
-                    this.view.plugin.settings.latitude = cityData.latitude.toString();
-                    // 更新排盘引擎的经纬度
-                    this.view.paipan.J = cityData.longitude;
-                    this.view.paipan.W = cityData.latitude;
-                    void this.view.plugin.saveSettings();
+            } else {
+                // 如果无法找到地理数据，使用用户上次的有效地理位置或默认值
+                if (this.view.currentData?.longitude && this.view.currentData?.latitude) {
+                    // 使用上次的有效地理位置
+                    this.view.paipan.J = this.view.currentData.longitude;
+                    this.view.paipan.W = this.view.currentData.latitude;
+                    longitude = this.view.currentData.longitude;
+                    latitude = this.view.currentData.latitude;
+                    console.debug('使用上次有效地理位置:', { 
+                        经度: longitude, 
+                        纬度: latitude 
+                    });
+                } else {
+                    // 使用默认位置（北京市中心）
+                    const defaultLongitude = 116.4074;
+                    const defaultLatitude = 39.9042;
+                    this.view.paipan.J = defaultLongitude;
+                    this.view.paipan.W = defaultLatitude;
+                    longitude = defaultLongitude;
+                    latitude = defaultLatitude;
+                    console.debug('使用默认地理位置（北京）:', { 
+                        经度: defaultLongitude, 
+                        纬度: defaultLatitude 
+                    });
                 }
+                void this.view.plugin.saveSettings();
+            }
+            
+            // 保存省市区信息到当前八字数据
+            if (this.view.currentData) {
+                this.view.currentData.province = selectedProvinceName;
+                this.view.currentData.city = selectedCityName;
+                this.view.currentData.district = selectedDistrict;
+                this.view.currentData.longitude = longitude;
+                this.view.currentData.latitude = latitude;
             }
 
             if (tabIndex === 0) {
@@ -498,8 +486,8 @@ export class TimeSettingModal extends Modal {
             }
 
             // 获取姓名信息、标签和时间校准状态
-            const name = (nameInput as HTMLInputElement).value || '案例';
-            const tag = (tagSelect as HTMLSelectElement).value;
+            const name = nameInput.value || '未命名';
+            const tag = tagSelect.value;
             const timeCorrectionEnabled = timeCorrectionCheckbox.checked;
             void this.view.calculateAndDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled, tag);
             this.close();
@@ -518,17 +506,13 @@ export class TimeSettingModal extends Modal {
         // 创建时间选择容器，所有下拉列表在同一行
         const timeRow = container.createEl('div');
         timeRow.addClass('bazi-time-selectors');
-        timeRow.style.display = 'flex';
-        timeRow.style.gap = '0px';
-        timeRow.style.alignItems = 'center';
-        timeRow.style.margin = '3px 0px 3px 0px';
 
         // 时间标签
         timeRow.createEl('label', { text: '时间：' });
 
         // 年
         const yearSelect = timeRow.createEl('select');
-        yearSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
+        yearSelect.addClass('ziping-time-selectList');
         for (let y = 1600; y <= 2100; y++) {
             yearSelect.createEl('option', { text: y.toString(), value: y.toString() });
         }
@@ -536,7 +520,7 @@ export class TimeSettingModal extends Modal {
 
         // 月
         const monthSelect = timeRow.createEl('select');
-        monthSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
+        monthSelect.addClass('ziping-time-selectList');
         for (let m = 1; m <= 12; m++) {
             monthSelect.createEl('option', { text: m.toString(), value: m.toString() });
         }
@@ -544,7 +528,7 @@ export class TimeSettingModal extends Modal {
 
         // 日
         const daySelect = timeRow.createEl('select');
-        daySelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
+        daySelect.addClass('ziping-time-selectList');
         for (let d = 1; d <= 31; d++) {
             daySelect.createEl('option', { text: d.toString(), value: d.toString() });
         }
@@ -552,7 +536,7 @@ export class TimeSettingModal extends Modal {
 
         // 时
         const hourSelect = timeRow.createEl('select');
-        hourSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
+        hourSelect.addClass('ziping-time-selectList');
         for (let h = 0; h < 24; h++) {
             hourSelect.createEl('option', { text: h.toString(), value: h.toString() });
         }
@@ -560,7 +544,7 @@ export class TimeSettingModal extends Modal {
 
         // 分
         const minuteSelect = timeRow.createEl('select');
-        minuteSelect.addClass('ziping-select-style');
+        minuteSelect.addClass('ziping-time-selectList');
         for (let m = 0; m < 60; m++) {
             minuteSelect.createEl('option', { text: m.toString(), value: m.toString() });
         }
@@ -577,7 +561,6 @@ export class TimeSettingModal extends Modal {
         let currentDay = now.getDate();
         let currentHour = now.getHours();
         let currentMinute = now.getMinutes();
-        let isLeap = false;
 
         if (currentData) {
             const lunarDate = this.view.paipan.getLunarDate(currentData.year, currentData.month, currentData.day);
@@ -585,7 +568,6 @@ export class TimeSettingModal extends Modal {
                 currentYear = lunarDate.year;
                 currentMonth = lunarDate.month;
                 currentDay = lunarDate.day;
-                isLeap = lunarDate.isLeap;
             }
             currentHour = currentData.hour;
             currentMinute = currentData.minute;
@@ -594,19 +576,12 @@ export class TimeSettingModal extends Modal {
         // 创建时间选择容器，所有下拉列表在同一行
         const timeRow = container.createEl('div');
         timeRow.addClass('bazi-time-selectors');
-        timeRow.style.display = 'flex';
-        timeRow.style.gap = '0px';
-        timeRow.style.alignItems = 'center';
-        timeRow.style.margin = '3px 0px 3px 0px';
-
-        // 时间标签
-        const timeLabel = timeRow.createEl('label', { text: '时间：' });
-        timeLabel.style.margin = '0';
-        timeLabel.style.padding = '0';
+        timeRow.classList.add('ziping-margin-6-0-6-0', 'ziping-flex', 'ziping-gap-0', 'ziping-flex-align-center');
+        timeRow.createEl('label', { text: '时间：' });
 
         // 年
         const yearSelect = timeRow.createEl('select');
-        yearSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
+        yearSelect.addClass('ziping-time-selectList');
         for (let y = 1900; y <= 2100; y++) {
             yearSelect.createEl('option', { text: y.toString(), value: y.toString() });
         }
@@ -614,7 +589,7 @@ export class TimeSettingModal extends Modal {
 
         // 月
         const monthSelect = timeRow.createEl('select');
-        monthSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
+        monthSelect.addClass('ziping-time-selectList');
 
         // 根据年份获取月份列表，包括闰月
         const updateMonthOptions = (year: number) => {
@@ -651,13 +626,13 @@ export class TimeSettingModal extends Modal {
 
         // 年份变化时更新月份选项
         yearSelect.addEventListener('change', () => {
-            const year = parseInt((yearSelect as HTMLSelectElement).value);
+            const year = parseInt(yearSelect.value);
             updateMonthOptions(year);
         });
 
         // 日
         const daySelect = timeRow.createEl('select');
-        daySelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
+        daySelect.addClass('ziping-time-selectList');
         const dayNames = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
             '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
             '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十'];
@@ -668,7 +643,7 @@ export class TimeSettingModal extends Modal {
 
         // 时
         const hourSelect = timeRow.createEl('select');
-        hourSelect.addClass('ziping-select-style', 'ziping-select-no-right-border');
+        hourSelect.addClass('ziping-time-selectList');
         for (let h = 0; h < 24; h++) {
             hourSelect.createEl('option', { text: h.toString(), value: h.toString() });
         }
@@ -676,7 +651,7 @@ export class TimeSettingModal extends Modal {
 
         // 分
         const minuteSelect = timeRow.createEl('select');
-        minuteSelect.addClass('ziping-select-style');
+        minuteSelect.addClass('ziping-time-selectList');
         for (let m = 0; m < 60; m++) {
             minuteSelect.createEl('option', { text: m.toString(), value: m.toString() });
         }
@@ -706,22 +681,16 @@ export class TimeSettingModal extends Modal {
             hourZhi: baziResult.dz[3]
         };
 
-        // 天干列表
         const ganList = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
-        // 地支列表
         const zhiList = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
-        // 阳干
         const yangGan = ['甲', '丙', '戊', '庚', '壬'];
-        // 阴干
         const yinGan = ['乙', '丁', '己', '辛', '癸'];
-        // 阳支
         const yangZhi = ['子', '寅', '辰', '午', '申', '戌'];
-        // 阴支
         const yinZhi = ['丑', '卯', '巳', '未', '酉', '亥'];
 
         // 第一排：天干下拉列表
         const ganRow = container.createEl('div');
-        ganRow.addClass('ziping-flex-gap-10-mb-10');
+        ganRow.addClass('Gan-cList');
 
         // 年柱天干
         const yearGanSelect = ganRow.createEl('select');
@@ -736,7 +705,6 @@ export class TimeSettingModal extends Modal {
         // 月柱天干（不可选，由年干和月支自动计算）
         const monthGanSelect = ganRow.createEl('select');
         monthGanSelect.disabled = true; // 设置为不可选
-        // 添加所有天干选项
         ganList.forEach(gan => {
             monthGanSelect.createEl('option', { text: gan, value: gan });
         });
@@ -754,14 +722,13 @@ export class TimeSettingModal extends Modal {
         // 时柱天干（不可选，由日干和时支自动计算）
         const hourGanSelect = ganRow.createEl('select');
         hourGanSelect.disabled = true; // 设置为不可选
-        // 添加所有天干选项
         ganList.forEach(gan => {
             hourGanSelect.createEl('option', { text: gan, value: gan });
         });
 
         // 第二排：地支下拉列表
         const zhiRow = container.createEl('div');
-        zhiRow.addClass('ziping-flex', 'ziping-gap-10');
+        zhiRow.addClass('Zhi-cList');
 
         // 年柱地支
         const yearZhiSelect = zhiRow.createEl('select');
@@ -787,19 +754,13 @@ export class TimeSettingModal extends Modal {
             const yearGan = yearGanSelect.value;
             const monthZhi = monthZhiSelect.value;
 
-            // 五虎遁口诀：甲己之年丙作首，乙庚之岁戊为头，丙辛之岁寻庚上，丁壬壬寅顺水流，若问戊癸何方发，甲寅之上好追求。
-            // 寅月的月干：甲己->丙，乙庚->戊，丙辛->庚，丁壬->壬，戊癸->甲
+            // 五虎遁
             const yinMonthGan: { [key: string]: string } = {
-                '甲': '丙',
-                '己': '丙',
-                '乙': '戊',
-                '庚': '戊',
-                '丙': '庚',
-                '辛': '庚',
-                '丁': '壬',
-                '壬': '壬',
-                '戊': '甲',
-                '癸': '甲'
+                '甲': '丙', '己': '丙',
+                '乙': '戊', '庚': '戊',
+                '丙': '庚', '辛': '庚',
+                '丁': '壬', '壬': '壬',
+                '戊': '甲', '癸': '甲'
             };
 
             // 地支顺序：子丑寅卯辰巳午未申酉戌亥
@@ -876,24 +837,17 @@ export class TimeSettingModal extends Modal {
             const dayGan = dayGanSelect.value;
             const hourZhi = hourZhiSelect.value;
 
-            // 五鼠遁口诀：甲己还加甲，乙庚丙作初，丙辛从戊起，丁壬庚子居，戊癸何方发，壬子是真途。
-            // 子时的时干：甲己->甲，乙庚->丙，丙辛->戊，丁壬->庚，戊癸->壬
+            // 五鼠遁
             const ziHourGan: { [key: string]: string } = {
-                '甲': '甲',
-                '己': '甲',
-                '乙': '丙',
-                '庚': '丙',
-                '丙': '戊',
-                '辛': '戊',
-                '丁': '庚',
-                '壬': '庚',
-                '戊': '壬',
-                '癸': '壬'
+                '甲': '甲', '己': '甲', 
+                '乙': '丙', '庚': '丙',
+                '丙': '戊', '辛': '戊',
+                '丁': '庚', '壬': '庚',
+                '戊': '壬', '癸': '壬'
             };
 
             // 地支顺序：子丑寅卯辰巳午未申酉戌亥
             const zhiOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
-
             let hourGan: string = '';
 
             if (hourZhi === '晚子时') {
@@ -912,7 +866,6 @@ export class TimeSettingModal extends Modal {
             } else {
                 const hourIndex = zhiOrder.indexOf(hourZhi);
                 const ziIndex = zhiOrder.indexOf('子');
-
                 // 计算时干：从子时开始，每过一个时辰，时干向后推一位
                 const ziGan = ziHourGan[dayGan];
                 if (!ziGan) return; // 如果找不到对应的子时天干，则不更新
@@ -940,7 +893,7 @@ export class TimeSettingModal extends Modal {
 
         // 添加筛选按钮
         const filterButton = container.createEl('button', {
-            text: '筛选匹配干支历的时间',
+            text: '筛选时间',
             cls: 'mod-cta'
         });
         filterButton.addClass('ziping-margin-top-20', 'ziping-margin-bottom-10');
@@ -1018,13 +971,11 @@ export class TimeSettingModal extends Modal {
 
                             // 添加悬停效果
                             listItem.addClass('ziping-transition-bg');
-
                             listItem.addEventListener('mouseenter', () => {
-                                listItem.style.backgroundColor = '#f0f0f0';
+                                listItem.addClass('ziping-background-f5f5f5');
                             });
-
                             listItem.addEventListener('mouseleave', () => {
-                                listItem.style.backgroundColor = '';
+                                listItem.removeClass('ziping-background-f5f5f5');
                             });
                         });
                     }

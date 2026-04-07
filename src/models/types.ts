@@ -18,6 +18,12 @@ export interface CurrentBaziData {
     selectedLiunianIndex?: number;
     timeCorrectionEnabled: boolean;
     tag: string;
+    // 地理位置信息
+    province?: string;
+    city?: string;
+    district?: string;
+    longitude?: number;
+    latitude?: number;
 }
 
 // Paipan.ts 中的类型定义

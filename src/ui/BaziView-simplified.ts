@@ -35,8 +35,8 @@ export class BaziView extends ItemView {
         super(leaf);
         this.plugin = plugin;
         this.paipan = new Paipan(false);
-        this.paipan.J = parseFloat(plugin.settings.longitude);
-        this.paipan.W = parseFloat(plugin.settings.latitude);
+        this.paipan.J = 0;
+        this.paipan.W = 0;
         
         // 初始化服务
         this.baziService = new BaziService(this.paipan);
@@ -193,10 +193,11 @@ export class BaziView extends ItemView {
             resultContainer.empty();
         }
         
-        // 获取八字数据
+        // 获取八字数据，传递现有的地理位置信息
         const baziData = await this.baziService.calculateBazi(
             year, month, day, hour, minute, second,
-            gender, name, timeCorrectionEnabled, tag
+            gender, name, timeCorrectionEnabled, tag,
+            this.currentData  // 传递现有的地理位置信息
         );
         
         if (!baziData) {
@@ -215,13 +216,9 @@ export class BaziView extends ItemView {
         
         // 显示结果
         if (resultContainer) {
-            // 显示时间信息
+            // 显示时间信息、八字表格、大运信息
             this.resultDisplay.displayResults(resultContainer, baziData);
-            
-            // 显示八字表格 - 调用正确的方法名
             this.baziTable.createBaziTable(resultContainer, baziData);
-            
-            // 显示大运信息 - 传入完整数据
             this.dayunDisplay.displayDayunInfo(resultContainer, baziData);
         }
     }
@@ -263,7 +260,10 @@ export class BaziView extends ItemView {
                 parsed.month,
                 parsed.day,
                 parsed.hour,
-                parsed.minute
+                parsed.minute,
+                0, // second
+                parsed.gender, // gender
+                name // name
             );
             new Notice(`已加载排盘码: ${name}`);
         } else {
@@ -333,10 +333,11 @@ export class BaziView extends ItemView {
         timeCorrectionEnabled: boolean,
         tag: string
     ): Promise<void> {
-        // 创建新的数据对象
+        // 创建新的数据对象，传递现有的地理位置信息
         const baziData = await this.baziService.calculateBazi(
             year, month, day, hour, minute, second,
-            gender, name, timeCorrectionEnabled, tag
+            gender, name, timeCorrectionEnabled, tag,
+            this.currentData  // 传递现有的地理位置信息
         );
         
         if (baziData) {

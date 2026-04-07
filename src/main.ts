@@ -7,6 +7,8 @@ import { initializeStyleUtils } from './utils/styleUtils';
 
 // 导入排盘引擎以初始化 window.p
 require('./paipan.js');
+import { IdentificationService } from './services/IdentificationService';
+import { BaziService } from './services/BaziService';
 
 export default class ZipingPlugin extends Plugin {
 	settings: ZipingSettings = DEFAULT_SETTINGS;
@@ -80,10 +82,31 @@ export default class ZipingPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	async saveBaziToFile(title: string, data: any) {
-		const basePath = this.settings.casePath || '命例';
-		const fileName = `${title || '命例'}.md`;
-		const filePath = `${basePath}/${fileName}`;
+    async saveBaziToFile(title: string, data: any) {
+        const basePath = this.settings.casePath || '命例';
+        
+        // 根据校时状态选择正确的时间来计算排盘码
+        const hour = data.timeCorrectionEnabled && data.bazi.zty ? data.bazi.zty.hour : data.hour;
+        const minute = data.timeCorrectionEnabled && data.bazi.zty ? data.bazi.zty.minute : data.minute;
+        
+        // 生成排盘码
+        const identificationService = new IdentificationService(this.app, new Paipan(), new BaziService(new Paipan()));
+        const paiPanCode = identificationService.generatePaiPanCode(
+            data.year, 
+            data.month, 
+            data.day, 
+            hour, 
+            minute, 
+            data.gender
+        );
+        
+        // 如果当前title是默认值，则使用排盘码+未命名格式
+        const isDefaultTitle = !title || title === '未命名' || title === '命例';
+        const fileName = isDefaultTitle ? 
+            `${paiPanCode}，未命名.md` : 
+            `${title}.md`;
+        
+        const filePath = `${basePath}/${fileName}`;
 
 		try {
 			// 检查并创建文件夹

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // 八字计算和显示服务
 import { Paipan } from '../Paipan';
 import { CurrentBaziData, BaziResult, CurrentDayunData, NearbySolarTerms, DayunItem } from '../models/types';
@@ -20,8 +21,15 @@ export class BaziService {
         gender: number,
         name: string,
         timeCorrectionEnabled: boolean,
-        tag: string
+        tag: string,
+        existingData?: CurrentBaziData | null
     ): Promise<CurrentBaziData> {
+        // 如果有现有的地理位置信息，应用到 Paipan 引擎中
+        if (existingData && existingData.longitude && existingData.latitude) {
+            this.paipan.J = existingData.longitude;
+            this.paipan.W = existingData.latitude;
+        }
+
         // 使用排盘引擎计算八字
         const baziResult = this.paipan.fatemaps(
             gender,
@@ -30,13 +38,12 @@ export class BaziService {
             day,
             hour,
             minute,
-            second
+            second,
+            timeCorrectionEnabled
         );
 
-        // 获取当前节气信息
+        // 获取当前节气信息、计算大运流年
         const solarTerms = this.getNearbySolarTerms(year, month, day);
-
-        // 计算大运流年
         const dayunData = this.calculateDayun(gender, year, month, day, hour, baziResult);
 
         // 确定当前大运索引
@@ -68,7 +75,7 @@ export class BaziService {
             }
         }
 
-        // 构建当前八字数据
+        // 构建当前八字数据，包含地理位置信息
         const currentData: CurrentBaziData = {
             year,
             month,
@@ -88,6 +95,15 @@ export class BaziService {
             tag
         };
 
+        // 保留现有的地理位置信息
+        if (existingData) {
+            currentData.province = existingData.province;
+            currentData.city = existingData.city;
+            currentData.district = existingData.district;
+            currentData.longitude = existingData.longitude;
+            currentData.latitude = existingData.latitude;
+        }
+
         return currentData;
     }
 
@@ -96,7 +112,7 @@ export class BaziService {
         try {
             return this.paipan.getNearbySolarTerms(year, month, day);
         } catch (error) {
-            console.error('获取节气信息失败:', error);
+            console.error('获取节气失败:', error);
             return {
                 previous: null,
                 next: null,
@@ -133,109 +149,6 @@ export class BaziService {
                 liunian: year,
                 allDayun: []
             };
-        }
-    }
-
-    // 渲染八字内容
-    renderBaziContent(container: Element, data: CurrentBaziData) {
-        // 创建内容区域
-        const contentDiv = container.createEl('div', { cls: 'bazi-content' });
-
-        // 显示四柱八字
-        this.renderFourPillars(contentDiv, data);
-
-        // 显示大运流年
-        this.renderDayun(contentDiv, data);
-
-        // 显示其他信息
-        this.renderAdditionalInfo(contentDiv, data);
-    }
-
-    // 渲染四柱八字
-    private renderFourPillars(container: Element, data: CurrentBaziData) {
-        const bazi = data.bazi;
-        
-        // 创建四柱八字容器
-        const baziContainer = container.createEl('div', { cls: 'bazi-four-pillars' });
-        
-        // 显示天干
-        const ganRow = baziContainer.createEl('div', { cls: 'bazi-row' });
-        ganRow.createEl('span', { text: '天干: ' });
-        bazi.gztg.forEach((gan, index) => {
-            ganRow.createEl('span', { text: gan, cls: 'bazi-gan' });
-            if (index < 3) ganRow.createEl('span', { text: ' ' });
-        });
-
-        // 显示地支
-        const zhiRow = baziContainer.createEl('div', { cls: 'bazi-row' });
-        zhiRow.createEl('span', { text: '地支: ' });
-        bazi.dz.forEach((zhi, index) => {
-            zhiRow.createEl('span', { text: zhi, cls: 'bazi-zhi' });
-            if (index < 3) zhiRow.createEl('span', { text: ' ' });
-        });
-    }
-
-    // 渲染大运流年
-    private renderDayun(container: Element, data: CurrentBaziData) {
-        const dayun = data.dayun;
-        
-        const dayunContainer = container.createEl('div', { cls: 'bazi-dayun' });
-        dayunContainer.createEl('h4', { text: '大运流年' });
-
-        // 显示当前大运
-        if (dayun.currentDayun) {
-            const currentDayunEl = dayunContainer.createEl('div', { cls: 'bazi-current-dayun' });
-            currentDayunEl.createEl('span', { 
-                text: `当前大运: ${dayun.currentDayun.gan}${dayun.currentDayun.zhi} (${dayun.currentDayun.age}岁)` 
-            });
-        }
-
-        // 显示流年
-        const liunianEl = dayunContainer.createEl('div', { cls: 'bazi-liunian' });
-        liunianEl.createEl('span', { text: `流年: ${dayun.liunian}` });
-
-        // 显示所有大运
-        if (dayun.allDayun && dayun.allDayun.length > 0) {
-            const allDayunEl = dayunContainer.createEl('div', { cls: 'bazi-all-dayun' });
-            allDayunEl.createEl('p', { text: '全部大运:' });
-            
-            const dayunList = allDayunEl.createEl('ul');
-            dayun.allDayun.forEach((dy, index) => {
-                const li = dayunList.createEl('li');
-                li.setText(`${dy.startYear}年 ${dy.gan}${dy.zhi} (${dy.age}岁)`);
-            });
-        }
-    }
-
-    // 渲染其他信息
-    private renderAdditionalInfo(container: Element, data: CurrentBaziData) {
-        const infoContainer = container.createEl('div', { cls: 'bazi-additional-info' });
-
-        // 显示节气信息
-        if (data.solarTerms) {
-            const solarTermsEl = infoContainer.createEl('div', { cls: 'bazi-solar-terms' });
-            solarTermsEl.createEl('h5', { text: '节气信息' });
-            
-            if (data.solarTerms.previous) {
-                solarTermsEl.createEl('p', { 
-                    text: `上一个节气: ${data.solarTerms.previous.name} (${data.solarTerms.previous.date.toLocaleDateString()})` 
-                });
-            }
-            if (data.solarTerms.next) {
-                solarTermsEl.createEl('p', { 
-                    text: `下一个节气: ${data.solarTerms.next.name} (${data.solarTerms.next.date.toLocaleDateString()})` 
-                });
-            }
-        }
-
-        // 显示时间校准状态
-        if (data.timeCorrectionEnabled) {
-            infoContainer.createEl('p', { text: '✓ 已启用时间校准', cls: 'bazi-time-correction' });
-        }
-
-        // 显示标签
-        if (data.tag) {
-            infoContainer.createEl('p', { text: `标签: ${data.tag}`, cls: 'bazi-tag' });
         }
     }
 }

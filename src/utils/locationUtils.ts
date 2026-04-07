@@ -72,26 +72,68 @@ export function findLocationData(districtName: string, cityName: string, provinc
 export function findLocationInGroups(districtName: string, cityName: string, provinceName: string): { longitude: number; latitude: number; } | null {
     if (!districtName || !cityName || !provinceName) return null;
 
+    console.debug('查找地理位置:', { provinceName, cityName, districtName });
+
     // 遍历省份-城市-区县数据
     for (const group of PROVINCE_CITY_DISTRICT_GROUPS) {
-        if (group.province.name === provinceName) {
+        // 省份匹配：去除可能的"省"、"市"后缀进行模糊匹配
+        let matchedProvince = group.province.name;
+        const normalizedProvinceName = provinceName.replace(/省|市|特别行政区/g, '');
+        const normalizedGroupProvince = matchedProvince.replace(/省|市|特别行政区/g, '');
+        
+        if (normalizedGroupProvince === normalizedProvinceName) {
             // 找到对应省份，寻找城市
-            const city = group.cities.find(c => c.name === cityName);
-            if (city) {
-                // 找到对应城市，寻找区县
-                const districts = group.districts.get(city.id);
-                if (districts && districts.length > 0) {
-                    const district = districts.find(d => d.name === districtName);
-                    if (district) {
-                        return {
-                            longitude: district.longitude,
-                            latitude: district.latitude
-                        };
+            for (const city of group.cities) {
+                // 城市匹配：去除可能的"市"后缀进行模糊匹配
+                const normalizedCityName = cityName.replace(/市/g, '');
+                const normalizedGroupCity = city.name.replace(/市/g, '');
+                
+                if (normalizedGroupCity === normalizedCityName || city.name.includes(cityName) || cityName.includes(city.name)) {
+                    // 找到对应城市，寻找区县
+                    const districts = group.districts.get(city.id);
+                    if (districts && districts.length > 0) {
+                        // 精确匹配优先
+                        let district = districts.find(d => d.name === districtName);
+                        if (!district) {
+                            // 模糊匹配：包含关系
+                            district = districts.find(d => 
+                                d.name.includes(districtName) || 
+                                districtName.includes(d.name) ||
+                                d.name.replace(/区|县|市/g, '') === districtName.replace(/区|县|市/g, '')
+                            );
+                        }
+                        
+                        if (district) {
+                            console.debug('找到匹配的地理位置:', { 
+                                省份: group.province.name, 
+                                城市: city.name, 
+                                区县: district.name,
+                                经度: district.longitude,
+                                纬度: district.latitude
+                            });
+                            return {
+                                longitude: district.longitude,
+                                latitude: district.latitude
+                            };
+                        }
                     }
+                    
+                    // 如果区县找不到，返回城市的经纬度作为回退
+                    console.debug('区县未找到，使用城市经纬度回退:', { 
+                        省份: group.province.name, 
+                        城市: city.name,
+                        经度: city.longitude,
+                        纬度: city.latitude
+                    });
+                    return {
+                        longitude: city.longitude,
+                        latitude: city.latitude
+                    };
                 }
             }
         }
     }
 
+    console.debug('地理位置查找失败，未找到匹配项');
     return null;
 }

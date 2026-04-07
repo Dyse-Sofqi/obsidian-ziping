@@ -48,7 +48,7 @@ export class DayunDisplay {
             const selectedLiunianYear = selectedDayunForDisplay.startYear + selectedLiunianIndex;
             const age = selectedLiunianYear - data.year + 1;
             const liuNianGanZhi = this.paipan.getYearGanZhi(selectedLiunianYear);
-            displayText = `大运：${selectedDayunForDisplay.gz}。流年: ${selectedLiunianYear}年${liuNianGanZhi.gan}${liuNianGanZhi.zhi}，${age}岁`;
+            displayText = `大运：${selectedDayunForDisplay.gz}。流年：${selectedLiunianYear}年${liuNianGanZhi.gan}${liuNianGanZhi.zhi}，${age}岁`;
         }
 
         // 大运信息

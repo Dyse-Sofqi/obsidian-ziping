@@ -243,18 +243,12 @@ export const PROVINCE_CITY_DISTRICT_GROUPS: ProvinceCityDistrictGroup[] = loadPr
 
 export interface ZipingSettings {
 	mySetting: string;
-	longitude: string;
-	latitude: string;
 	casePath: string; // 案例保存路径
-	city: string; // 当前选择的城市
 }
 
 export const DEFAULT_SETTINGS: ZipingSettings = {
 	mySetting: 'default',
-	longitude: '120',
-	latitude: '35',
-	casePath: '命例',
-	city: '杭州'
+	casePath: '命例'
 }
 
 export class ZipingSettingTab extends PluginSettingTab {
@@ -271,41 +265,10 @@ export class ZipingSettingTab extends PluginSettingTab {
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Settings #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
-
-		new Setting(containerEl)
 			.setHeading()
 			.setName('Paipan calendar settings');
 
-		new Setting(containerEl)
-			.setName('Longitude')
-			.setDesc('经度 (东经为正)')
-			.addText(text => text
-				.setPlaceholder('120')
-				.setValue(this.plugin.settings.longitude)
-				.onChange(async (value) => {
-					this.plugin.settings.longitude = value;
-					await this.plugin.saveSettings();
-				}));
 
-		new Setting(containerEl)
-			.setName('Latitude')
-			.setDesc('纬度 (北纬为正)')
-			.addText(text => text
-				.setPlaceholder('35')
-				.setValue(this.plugin.settings.latitude)
-				.onChange(async (value) => {
-					this.plugin.settings.latitude = value;
-					await this.plugin.saveSettings();
-				}));
 
 		new Setting(containerEl)
 			.setName('Case save path')
@@ -318,26 +281,5 @@ export class ZipingSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 
-
-
-		new Setting(containerEl)
-			.setName('City')
-			.setDesc('选择城市用于计算真太阳时')
-			.addDropdown(dropdown => {
-				CITIES.forEach(city => {
-					dropdown.addOption(city.name, city.name);
-				});
-				dropdown.setValue(this.plugin.settings.city || '杭州');
-				dropdown.onChange(async (value) => {
-					this.plugin.settings.city = value;
-					// 根据城市更新经纬度
-					const cityData = CITIES.find(c => c.name === value);
-					if (cityData) {
-						this.plugin.settings.longitude = cityData.longitude.toString();
-						this.plugin.settings.latitude = cityData.latitude.toString();
-					}
-					await this.plugin.saveSettings();
-				});
-			});
 	}
 }
