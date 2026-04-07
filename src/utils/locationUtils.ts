@@ -126,8 +126,8 @@ export function findLocationInGroups(districtName: string, cityName: string, pro
                         纬度: city.latitude
                     });
                     return {
-                        longitude: city.longitude,
-                        latitude: city.latitude
+                        longitude: city.longitude || 0,
+                        latitude: city.latitude || 0
                     };
                 }
             }

@@ -30,6 +30,8 @@ export interface CityLevelData {
 	name: string;
 	id: number;
 	provinceId: number;
+	longitude?: number;
+	latitude?: number;
 }
 
 // 区县数据类型
