@@ -173,6 +173,7 @@ export class TimeSettingModal extends Modal {
             type: 'checkbox'
         });
         timeCorrectionCheckbox.id = 'time-correction-checkbox';
+        timeCorrectionCheckbox.addClass('ziping-switch-checkbox');
 
         // 城市选择 - 省市区三级联动
         const cityContainer = tabContent.createEl('div');

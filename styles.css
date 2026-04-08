@@ -406,3 +406,45 @@
 .theme-light #bazi-result tr:nth-child(8) .c-水 {
     color: #2196f3 !important;
 }
+
+/* 1. 基础复选框样式：隐藏原生样式，画成圆角矩形条 */
+.tab-content .ziping-switch-checkbox {
+    appearance: none;
+    width: 44px;
+    height: 24px;
+    background-color: #ccc;
+    border-radius: 24px;
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    outline: none;
+    border: none;
+}
+
+/* 2. 白色圆点（滑块） */
+.tab-content .ziping-switch-checkbox::before {
+    content: "";
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: white;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s;
+}
+body .tab-content .ziping-switch-checkbox:checked:after {
+    --webkit-appearance: none;
+    appearance: none;
+}
+
+
+/* 3. 选中（开启）状态：改变背景色 */
+.tab-content .ziping-switch-checkbox:checked {
+  background-color: var(--interactive-accent); 
+}
+
+/* 4. 选中时圆点向右滑动 */
+.tab-content .ziping-switch-checkbox:checked::before {
+  transform: translateX(20px);
+}
