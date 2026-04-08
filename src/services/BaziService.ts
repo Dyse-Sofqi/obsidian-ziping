@@ -30,8 +30,8 @@ export class BaziService {
             this.paipan.W = existingData.latitude;
         }
 
-        // 使用排盘引擎计算八字
-        const baziResult = this.paipan.fatemaps(
+        // 使用排盘引擎计算八字（获取完整结果）
+        const engineResult = (this.paipan as any).engine.fatemaps(
             gender,
             year,
             month,
@@ -39,12 +39,22 @@ export class BaziService {
             hour,
             minute,
             second,
-            timeCorrectionEnabled
+            timeCorrectionEnabled ? (this.paipan as any).J : undefined,
+            timeCorrectionEnabled ? (this.paipan as any).W : undefined
         );
+
+        // 从完整结果中提取 BaziResult
+        const baziResult: BaziResult = {
+            gztg: engineResult.ctg,
+            dz: engineResult.cdz,
+            nyy: engineResult.nyy || [0, 0],
+            nwx: engineResult.nwx || [0, 0, 0, 0, 0],
+            zty: engineResult.zty
+        };
 
         // 获取当前节气信息、计算大运流年
         const solarTerms = this.getNearbySolarTerms(year, month, day);
-        const dayunData = this.calculateDayun(gender, year, month, day, hour, baziResult);
+        const dayunData = this.calculateDayun(gender, year, month, day, hour, engineResult);
 
         // 确定当前大运索引
         const currentYear = new Date().getFullYear();
@@ -128,12 +138,11 @@ export class BaziService {
         month: number,
         day: number,
         hour: number,
-        baziResult: BaziResult
+        engineResult: any
     ): CurrentDayunData {
         try {
-            // 注意：Paipan类的getCurrentDayun方法只接受4个参数：birthYear, birthMonth, birthDay, gender
-            // hour参数在getCurrentDayun中未使用，所以忽略hour参数
-            return this.paipan.getCurrentDayun(year, month, day, gender);
+            // 将第一次 fatemaps() 的结果传递给 getCurrentDayun() 方法，避免重复计算
+            return this.paipan.getCurrentDayun(year, month, day, gender, hour, undefined, undefined, engineResult);
         } catch (error) {
             console.error('计算大运流年失败:', error);
             // 返回默认值

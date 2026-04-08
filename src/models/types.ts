@@ -18,12 +18,12 @@ export interface CurrentBaziData {
     selectedLiunianIndex?: number;
     timeCorrectionEnabled: boolean;
     tag: string;
-    // 地理位置信息
     province?: string;
     city?: string;
     district?: string;
     longitude?: number;
     latitude?: number;
+    showHourPillar?: boolean;
 }
 
 // Paipan.ts 中的类型定义
@@ -64,6 +64,7 @@ export interface CurrentDayunData {
     currentDayun: DayunItem;
     liunian: number;
     allDayun: DayunItem[];
+    qyy_desc?: string;
     qyy_desc2?: string;
 }
 

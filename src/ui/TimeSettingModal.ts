@@ -42,17 +42,17 @@ export class TimeSettingModal extends Modal {
             const btn = tabButtons.createEl('button', { text: tab });
             tabButtonElements.push(btn);
             // 设置按钮基础样式
-            btn.classList.add('ziping-border-radius-0', 'ziping-boxShadow-none', 'ziping-button-inactive');
+            btn.addClass('ziping-border-radius-0', 'ziping-boxShadow-none', 'ziping-button-inactive');
             btn.addEventListener('click', () => {
                 activeTab = index;
                 // 更新所有按钮的样式
                 tabButtonElements.forEach((button, i) => {
                     if (i === index) {
-                        button.classList.remove('ziping-button-inactive');
-                        button.classList.add('ziping-button-active');
+                        button.removeClass('ziping-button-inactive');
+                        button.addClass('ziping-button-active');
                     } else {
-                        button.classList.remove('ziping-button-active');
-                        button.classList.add('ziping-button-inactive');
+                        button.removeClass('ziping-button-active');
+                        button.addClass('ziping-button-inactive');
                     }
                 });
                 this.renderTabContent(contentEl, activeTab);
@@ -60,7 +60,7 @@ export class TimeSettingModal extends Modal {
         });
         // 初始化第一个按钮为选中状态
         if (tabButtonElements.length > 0 && tabButtonElements[0]) {
-            tabButtonElements[0].classList.add('ziping-button-active');
+            tabButtonElements[0].addClass('ziping-button-active');
         }
 
         this.renderTabContent(contentEl, activeTab);
@@ -91,7 +91,7 @@ export class TimeSettingModal extends Modal {
             type: 'text',
             value: defaultName
         });
-        nameInput.classList.add('ziping-margin-right-10');
+        nameInput.addClass('ziping-margin-right-10');
 
         // 点击后自动清除默认文本
         nameInput.addEventListener('focus', () => {
@@ -120,7 +120,7 @@ export class TimeSettingModal extends Modal {
         // 设置默认选择状态
         maleRadio.checked = currentData?.gender === 0;
         const maleLabel = genderContainer.createEl('label', { text: '男' });
-        maleLabel.classList.add('ziping-margin-right-10');
+        maleLabel.addClass('ziping-margin-right-10');
 
         // 女单选按钮
         const femaleRadio = genderContainer.createEl('input', {
@@ -134,10 +134,10 @@ export class TimeSettingModal extends Modal {
 
         // 标签选择
         const tagLabel = nameGenderRow.createEl('label', { text: '标签：' });
-        tagLabel.classList.add('ziping-margin-left-10');
+        tagLabel.addClass('ziping-margin-left-10');
 
         const tagSelect = nameGenderRow.createEl('select');
-        tagSelect.classList.add('margin-left-10', 'margin-right-10', 'ziping-border-1-ccc', 'ziping-boxShadow-none');
+        tagSelect.addClass('margin-left-10', 'margin-right-10', 'ziping-border-1-ccc', 'ziping-boxShadow-none');
 
         // 添加标签选项
         const tagOptions = ['关注', '亲友', '名人', '古籍', '客户', '其他'];
@@ -167,13 +167,13 @@ export class TimeSettingModal extends Modal {
         // 校时复选框
         const timeCorrectionContainer = tabContent.createEl('div');
         timeCorrectionContainer.addClass('ziping-flex-gap-0-mb-6-0-6-0');
-        const timeCorrectionLabel = timeCorrectionContainer.createEl('label', { text: '校时' });
-        timeCorrectionLabel.htmlFor = 'time-correction-checkbox';
         const timeCorrectionCheckbox = timeCorrectionContainer.createEl('input', {
             type: 'checkbox'
         });
         timeCorrectionCheckbox.id = 'time-correction-checkbox';
         timeCorrectionCheckbox.addClass('ziping-switch-checkbox');
+        const timeCorrectionLabel = timeCorrectionContainer.createEl('label', { text: '校时' });
+        timeCorrectionLabel.htmlFor = 'time-correction-checkbox';
 
         // 城市选择 - 省市区三级联动
         const cityContainer = tabContent.createEl('div');
@@ -184,46 +184,32 @@ export class TimeSettingModal extends Modal {
         provinceLabel.setText('省：');
         const provinceSelect = cityContainer.createEl('select');
         provinceSelect.id = 'province-select';
-        provinceSelect.classList.add('ziping-margin-right-10', 'ziping-border-1-ccc', 'ziping-boxShadow-none');
+        provinceSelect.addClass('ziping-margin-right-10', 'ziping-border-1-ccc', 'ziping-boxShadow-none');
 
         // 地级市选择
         const cityLabel = cityContainer.createEl('span');
         cityLabel.setText('市：');
         const citySelect = cityContainer.createEl('select');
         citySelect.id = 'city-select';
-        citySelect.classList.add('ziping-margin-right-10', 'ziping-border-1-ccc', 'ziping-boxShadow-none');
+        citySelect.addClass('ziping-margin-right-10', 'ziping-border-1-ccc', 'ziping-boxShadow-none');
 
         // 区县选择
         const districtLabel = cityContainer.createEl('span');
         districtLabel.setText('区：');
         const districtSelect = cityContainer.createEl('select');
         districtSelect.id = 'district-select';
-        districtSelect.classList.add('ziping-border-1-ccc', 'ziping-boxShadow-none');
+        districtSelect.addClass('ziping-border-1-ccc', 'ziping-boxShadow-none');
 
         // 管理时间校正状态函数
         const manageTimeCorrectionState = (isEnabled: boolean) => {
-            // 设置所有选择器的禁用状态
-            provinceSelect.disabled = !isEnabled;
-            citySelect.disabled = !isEnabled;
-            districtSelect.disabled = !isEnabled;
-
-            // 更新样式以反映禁用状态
+            // 设置城市选择容器的显示/隐藏状态
             if (!isEnabled) {
-                provinceSelect.removeClass('ziping-isDisabled-select');
-                citySelect.removeClass('ziping-isDisabled-select');
-                districtSelect.removeClass('ziping-isDisabled-select');
-                // 清空值
-                provinceSelect.innerHTML = '';
-                provinceSelect.value = '';
-                citySelect.innerHTML = '';
-                citySelect.value = '';
-                districtSelect.innerHTML = '';
-                districtSelect.value = '';
+                // 未勾选校时checkbox时隐藏整个城市选择容器
+                cityContainer.style.display = 'none';
             } else {
-                provinceSelect.addClass('ziping-isDisabled-select');
-                citySelect.addClass('ziping-isDisabled-select');
-                districtSelect.addClass('ziping-isDisabled-select');
-
+                // 勾选校时checkbox时显示整个城市选择容器
+                cityContainer.style.display = 'flex';
+                
                 // 重新填充省份选择器（三级联动）
                 const emptyProvinceOption = provinceSelect.createEl('option');
                 emptyProvinceOption.textContent = '省份';
@@ -577,7 +563,7 @@ export class TimeSettingModal extends Modal {
         // 创建时间选择容器，所有下拉列表在同一行
         const timeRow = container.createEl('div');
         timeRow.addClass('bazi-time-selectors');
-        timeRow.classList.add('ziping-margin-6-0-6-0', 'ziping-flex', 'ziping-gap-0', 'ziping-flex-align-center');
+        timeRow.addClass('ziping-margin-6-0-6-0', 'ziping-flex', 'ziping-gap-0', 'ziping-flex-align-center');
         timeRow.createEl('label', { text: '时间：' });
 
         // 年

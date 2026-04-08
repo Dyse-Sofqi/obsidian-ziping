@@ -206,7 +206,7 @@ function paipan() {
      */
     this.sjdz = [1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4, 1];
 	/**
-	 * 节气修复 XiuFu 使农历-720年至2300年与寿星万年历匹配,键分别为公历年份和该年自春分开始的廿四节气
+	 * 节气修复 XiuFu 使农历-720年至2300年与寿星万年历匹配,键分别为「公历年份」和该年自「春分」开始的廿四节气
 	 */
 	this.jqXFu = {
 		'-680':{9:-1},
@@ -1450,29 +1450,40 @@ function paipan() {
         var yy = this.floatval(yy);
         var mm = this.floatval(mm);
         var dd = this.floatval(dd);
-        var hh = (hh === undefined) ? 12 : this.floatval(hh);
+        // 准确的时间输入对于起运计算至关重要，避免使用不合理的默认值
+        if (hh === undefined || mt === undefined || ss === undefined) {
+            console.warn("警告：排盘需要完整的时间信息（时、分、秒），使用默认值可能影响起运计算精度");
+        }
+        
+        var hh = (hh === undefined) ? 0 : this.floatval(hh);  // 默认0点比12点更合理，减少日界影响
         var mt = (mt === undefined) ? 0 : this.floatval(mt);
         var ss = (ss === undefined) ? 0 : this.floatval(ss);
 
-        var yp = yy + Math.floor((mm - 3) / 10);
-        if ((yy > 1582) || (yy == 1582 && mm > 10) || (yy == 1582 && mm == 10 && dd >= 15)) {
-            var init = 1721119.5;
-            var jdy = Math.floor(yp * 365.25) - Math.floor(yp / 100) + Math.floor(yp / 400);
-        } else {
-            if ((yy < 1582) || (yy == 1582 && mm < 10) || (yy == 1582 && mm == 10 && dd <= 4)) {
-                var init = 1721117.5;
-                var jdy = Math.floor(yp * 365.25);
-            } else { //不存在的时间
-                return false;
-            }
+        // 标准Meeus儒略日算法（天体算法权威）
+        // 步骤1: 如果月份<=2，则年份-1，月份+12
+        var Y = yy;
+        var M = mm;
+        if (M <= 2) {
+            Y = Y - 1;
+            M = M + 12;
         }
-        var mp = Math.floor(mm + 9) % 12;
-        var jdm = mp * 30 + Math.floor((mp + 1) * 34 / 57);
-        var jdd = dd - 1;
-        hh = hh + ((ss / 60) + mt) / 60;
-        var jdh = hh / 24;
-        return jdy + jdm + jdd + jdh + init;
+        
+        // 步骤2: 计算A = INT(Y/100)
+        var A = Math.floor(Y / 100);
+        
+        // 步骤3: 计算B = 2 - A + INT(A/4) （格里高利历修正项）
+        var B = 2 - A + Math.floor(A / 4);
+        
+        // 步骤4: 计算儒略日整数部分
+        var jd = Math.floor(365.25 * (Y + 4716)) + Math.floor(30.6001 * (M + 1)) + dd + B - 1524.5;
+        
+        // 步骤5: 添加时间部分
+        var time = (hh + mt / 60 + ss / 3600) / 24;
+        var result = jd + time;
+        
+        return result;
     };
+    
     /**
      * 將儒略日轉换爲公历(即陽曆或格里曆)年月日時分秒 [年,月,日,时,分,秒]
      * @param float jd
@@ -2603,7 +2614,7 @@ function paipan() {
         var yy = this.intval(yy);
         var mm = this.intval(mm);
         var dd = this.intval(dd);
-        var hh = this.intval(hh);
+        var hh = (hh === undefined) ? 12 : this.intval(hh);
         var mt = (mt === undefined) ? 0 : this.intval(mt);
         var ss = (ss === undefined) ? 0 : this.intval(ss);
 
@@ -2686,58 +2697,139 @@ function paipan() {
         rt['wxcg'] = wxcg;
         rt['yycg'] = yycg;
 
-        //求算起運時刻
+        //求算起運時刻 - 使用新的简化算法
+        var adjustedJr = ob.jr.slice(); //复制节气数组
+        
+        // 如果使用了真太阳时，需要将节气数组也转换为对应的本地时间基准
+        if(J !== undefined){ //有传参,需要转地方真太阳时
+            var timeDiffHours = (J - 120) * 4 / 60; //经度差对应的时差（小时）
+            var jdDiff = timeDiffHours / 24; //转换为Julian Day差异
+            
+            // 调整节气数组到相同的本地时间基准
+            for(var k = 0; k < adjustedJr.length; k++){
+                adjustedJr[k] = adjustedJr[k] + jdDiff;
+            }
+        }
+        
+        var forward; //大运顺逆排法判断
+        var yearGan = this.ctg[tg[0]]; //年干文字
+        
+        // 判断大运顺排还是逆排
+        var yangGan = ['甲', '丙', '戊', '庚', '壬'];
+        var isYangGan = yangGan.indexOf(yearGan) !== -1;
+        var isMale = xb === 0;
+        var isForward = (isYangGan && isMale) || (!isYangGan && !isMale);
+        forward = isForward ? 0 : 1;
+        
+        // 查找相关节气
         for (var i = 0; ; i++) { //先找到指定時刻前後的節氣月首
-            if (spcjd < ob.jr[21 + 2*i]) {
+            if (spcjd < adjustedJr[21 + 2*i]) {
                 var ord = i - 1;
                 break;
             } //ord即為指定時刻所在的節氣月首JD值
         }
-		
-		var ta = this.pdy ? this.ty : 360; //一個廻歸年的天數
-		
-        var xf = spcjd - ob.jr[21 + 2*ord]; //xf代表節氣月的前段長,單位為日,以指定時刻為分界點
-        var yf = ob.jr[21 + 2*ord + 2] - spcjd; //yf代表節氣月的後段長
-        if (((xb == 0) && (yytg[0] == 0)) || ((xb == 1) && (yytg[0] == 1))) {
-			if(this.pdy){
-				var zf = ta * 10 * (yf / (yf + xf)); //zf為指定日開始到起運日之間的總日數(精確法)
-			}else{
-				var zf = ta * 10 * (yf / 30); //zf為指定日開始到起運日之間的總日數(粗略法）三天折合一年,一天折合四个月,一个时辰折合十天,一个小时折合五天,反推得到一年按360天算,一个月按30天算
-			}
-            var forward = 0; //陽年男或陰年女,其大運是順推的
+        
+        // 确定要使用的节气（根据大运顺逆排法）
+        var targetJQ;
+        if (forward === 0) {
+            // 顺排：使用下一个节气
+            targetJQ = adjustedJr[21 + 2*ord + 2]; 
         } else {
-			if(this.pdy){
-				var zf = ta * 10 * (xf / (yf + xf)); //陰年男或陽年女,其大運是逆推的
-			}else{
-				var zf = ta * 10 * (xf / 30); //(粗略法)
+            // 逆排：使用当前节气
+            targetJQ = adjustedJr[21 + 2*ord];
+        }
+        
+        // 使用真正的简化算法计算起运 - 完全绕过儒略日换算
+        var qiyunResult;
+		try {
+			// 直接使用已有的年月日时分秒数据生成时间戳
+			var birthTimestamp = this.dateTimeToTimestamp(yy, mm, dd, hh, mt, ss);
+			
+			// 使用Jtime方法将儒略日转换为日期时间数组
+			var solarTermDateTime = this.Jtime(targetJQ);			
+			// 检查每个参数是否有效
+			var validParams = true;
+			for (var i = 0; i < 6; i++) {
+				if (solarTermDateTime[i] === undefined || solarTermDateTime[i] === null || isNaN(solarTermDateTime[i])) {
+					console.error('节气参数无效 - 索引:', i, '值:', solarTermDateTime[i]);
+					validParams = false;
+				}
 			}
-            var forward = 1;
-        }
-		var y = this.intval(zf / ta);
-		var m = this.intval(zf % ta / (ta / 12));
-		var d = this.intval(zf % ta % (ta / 12));
+			
+			if (!validParams) {
+				throw new Error('节气参数包含无效值');
+			}
+			
+			var solarTermTimestamp = this.dateTimeToTimestamp(solarTermDateTime[0], solarTermDateTime[1], solarTermDateTime[2], solarTermDateTime[3], solarTermDateTime[4], solarTermDateTime[5]);
+				
+			// 打印使用的两个时间戳
+			console.log('出生时间戳:', birthTimestamp, '对应时间:', new Date(birthTimestamp).toLocaleString());
+			console.log('节气时间戳:', solarTermTimestamp, '对应时间:', new Date(solarTermTimestamp).toLocaleString());
+			console.log('时间戳差值(秒):', Math.abs(solarTermTimestamp - birthTimestamp) / 1000);
+			console.log('时间戳差值(天):', Math.abs(solarTermTimestamp - birthTimestamp) / (24 * 60 * 60 * 1000));
 		
-        rt['qyy_desc'] = "出生后" + y + "年" + m + "个月" + d + "天起运"; //与十三行八字一致
-		
-        var qyt = spcjd + (y + m/12 + d/this.ty)*this.ty; //转按回归年算
-        var jt = this.Jtime(qyt); //將起運時刻的JD值轉換為年月日時分秒
-        var qyy = jt[0]; //起運年(公历)
-
-        rt['qyy'] = qyy; //起運年
-
-        //求算起運年(指節氣年,农历)
-        var qjr = this.GetAdjustedJQ(qyy - 1, false); //立春在上一年的以春分开始的数组中
-        if (qyt >= qjr[21]) { //qjr[21]為立春,約在2月5日前後,
-            var jqyy = qyy;
-        } else {
-            var jqyy = qyy - 1; //若小於jr[21],則屬於前一個節氣年
+            qiyunResult = this.calculateQiyunSimplified(birthTimestamp, solarTermTimestamp, isForward);
+        } catch (error) {
+            console.warn('起运计算失败', error);
         }
+        
+		rt['qyy_desc'] = qiyunResult.description;
+		
+		// 检查是否使用新方法的起运时间戳
+		if (qiyunResult.qiyunTimestamp) {
+			// 使用新方法：直接使用时间戳
+			var qiyunDate = new Date(qiyunResult.qiyunTimestamp);
+			var qyy = qiyunDate.getFullYear(); //起運年(公历)
+			rt['qyy'] = qyy;
+			
+			// 转换到日历格式用于后续显示
+			var jt = [
+				qyy,
+				qiyunDate.getMonth() + 1,
+				qiyunDate.getDate(),
+				qiyunDate.getHours(),
+				qiyunDate.getMinutes(),
+				qiyunDate.getSeconds()
+			];
+		} else {
+			// 使用旧方法：基于儒略日
+			var qyt = spcjd + (qiyunResult.years + qiyunResult.months/12 + qiyunResult.days/this.ty)*this.ty; //转按回归年算
+			var jt = this.Jtime(qyt); //將起運時刻的JD值轉換為年月日時分秒
+			var qyy = jt[0]; //起運年(公历)
+			rt['qyy'] = qyy; //起運年
+		}
 
-        //求算起運年及其後第五年的年干支及起運歲
-        var jtd = ((jqyy + 4712 + 24) % 10 + 10) % 10;
-        jtd = this.ctg[((jqyy + 4712 + 24) % 10 + 10) % 10] + "、" + this.ctg[((jqyy + 4712 + 24 + 5) % 10 + 10) % 10];
-        rt['qyy_desc2'] = "逢" + jtd + "年" + jt[1] + "月" + jt[2] + "日" + jt[3] + "时交脱大运"; //顯示每十年為一階段之起運時刻,分兩個五年以年天干和陽曆日期表示
-        var qage = jqyy - ob.ty; //起運年減去出生年再加一即為起運之歲數,從懷胎算起,出生即算一歲
+		//求算起運年(指節氣年,农历)
+		var jqyy;
+		
+		if (qiyunResult.qiyunTimestamp) {
+			// 新方法：直接根据公历日期判断节气年
+			// 立春通常是2月4-5日，在此之前属于前一年的节气年
+			var month = jt[1];
+			var day = jt[2];
+			
+			if (month < 2 || (month === 2 && day < 4)) {
+				// 2月4日前属于前一年的节气年
+				jqyy = qyy - 1;
+			} else {
+				// 2月4日及之后属于当年的节气年
+				jqyy = qyy;
+			}
+		} else {
+			// 旧方法：基于儒略日判断节气年
+			var qjr = this.GetAdjustedJQ(qyy - 1, false); //立春在上一年的以春分开始的数组中
+			if (qyt >= qjr[21]) { //qjr[21]為立春,約在2月5日前後,
+				jqyy = qyy;
+			} else {
+				jqyy = qyy - 1; //若小於jr[21],則屬於前一個節氣年
+			}
+		}
+
+		//求算起運年及其後第五年的年干支及起運歲
+		var jtd = ((jqyy + 4712 + 24) % 10 + 10) % 10;
+		jtd = this.ctg[((jqyy + 4712 + 24) % 10 + 10) % 10] + "、" + this.ctg[((jqyy + 4712 + 24 + 5) % 10 + 10) % 10];
+		rt['qyy_desc2'] = "逢" + jtd + "年" + jt[1] + "月" + jt[2] + "日" + jt[3] + "时交脱大运"; //顯示每十年為一階段之起運時刻,分兩個五年以年天干和陽曆日期表示
+		var qage = jqyy - ob.ty; //起運年減去出生年再加一即為起運之歲數,從懷胎算起,出生即算一歲
 
         rt['dy'] = []; //大运
 
@@ -2826,6 +2918,93 @@ function paipan() {
 
         return rt;
     };
+
+	/**
+	 * 统一版起运计算函数 - 使用时间戳差值计算
+	 * 支持秒级和毫秒级时间戳自动识别处理
+	 * 算法流程：
+	 * 1. 自动识别时间戳单位（秒或毫秒）并统一处理
+	 * 2. 转换为天数差：timeDiffDays = timeDiffSeconds / (24 * 60 * 60)
+	 * 3. 按命理规则换算：3天=1年，120天=4个月
+	 * 4. 年 = int(timeDiffDays / 3)
+	 * 5. 月 = int((timeDiffDays % 3) / (120/30))
+	 * 6. 日 = int((timeDiffDays % 3) % (120/30))
+	 * 
+	 * @param {number} birthTimestamp 出生时间戳（支持秒级或毫秒级）
+	 * @param {number} solarTermTimestamp 节令时间戳（支持秒级或毫秒级）
+	 * @param {boolean} isForward 大运顺排还是逆排（true=顺排，false=逆排）
+	 * @returns {Object} 起运信息
+	 */
+	this.calculateQiyunSimplified = function(birthTimestamp, solarTermTimestamp, isForward) {
+		// 检查输入时间戳的有效性
+		if (!birthTimestamp || !solarTermTimestamp) {
+			throw new Error('无效的时间戳：时间戳不能为空');
+		}
+		
+		// 自动识别时间戳单位并统一为秒级
+		// 毫秒级时间戳通常大于1e11，秒级时间戳小于1e11
+		var isMilliseconds = birthTimestamp > 1e11 || solarTermTimestamp > 1e11;
+		
+		if (isMilliseconds) {
+			// 转换毫秒级时间戳为秒级
+			birthTimestamp = Math.floor(birthTimestamp / 1000);
+			solarTermTimestamp = Math.floor(solarTermTimestamp / 1000);
+		}
+		
+		// 在转换单位后检查时间顺序
+		if (birthTimestamp >= solarTermTimestamp) {
+			throw new Error('无效的时间戳：出生时间必须早于节令时间');
+		}
+		
+		// 根据顺逆排法决定使用哪个节气时间
+		var jqTimestamp = isForward ? solarTermTimestamp : birthTimestamp;
+		var targetTimestamp = isForward ? birthTimestamp : solarTermTimestamp;
+		
+		// 时间戳差值转天数
+		var timeDiffSeconds = Math.abs(jqTimestamp - targetTimestamp);
+		var timeDiffDays = timeDiffSeconds / 86400;
+
+		// 1. 起运年数
+		var totalYears = Math.floor(timeDiffDays / 3);
+
+		// 2. 剩余天真日 (不能直接用于算月)
+		var remainingRealDays = timeDiffDays % 3;
+
+		// 3. 剩余天真日换算为命理虚日总数 (1天 = 120虚日)
+		var virtualDays = remainingRealDays * 120;
+
+		// 4. 月份数 (1月 = 30虚日)
+		var totalMonths = Math.floor(virtualDays / 30);
+
+		// 5. 剩余天数
+		var finalDays = Math.floor(virtualDays % 30);
+		
+		// 组合起运描述
+		var description = "出生后" + totalYears + "年" + totalMonths + "个月" + finalDays + "天起运";
+		
+		// 计算真正的起运时间戳（单位为毫秒）
+		// 注意：birthTimestamp已经是秒级，需要先转换为毫秒级
+		var qiyunTimestamp = birthTimestamp * 1000 + timeDiffSeconds * 1000;
+		
+		return {
+			years: totalYears,
+			months: totalMonths,
+			days: finalDays,
+			description: description,
+			qiyunTimestamp: qiyunTimestamp, // 直接返回的时间戳
+			totalSeconds: timeDiffSeconds   // 总秒数差
+		};
+	};
+	
+	/**
+	 * 将年月日时分秒直接转换为时间戳 - 完全绕过儒略日
+	 */
+	this.dateTimeToTimestamp = function(year, month, day, hour, minute, second) {
+		// 使用Date对象直接构造时间并获取时间戳
+		var date = new Date(year, month - 1, day, hour, minute, second);
+		// 返回毫秒级时间戳，与TypeScript版本保持一致
+		return date.getTime();
+	};
 }
 window.paipan = paipan; // 将构造函数挂载到 window 对象上
 window.p = window.p || new paipan();

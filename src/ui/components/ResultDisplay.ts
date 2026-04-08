@@ -6,14 +6,16 @@ import { CurrentBaziData } from '../../models/types';
 export class ResultDisplay {
     private paipan: Paipan;
     private onTimeAdjust?: (hourDelta: number) => void;
+    private onHourPillarToggle?: (showHourPillar: boolean) => void;
 
     constructor(paipan: Paipan) {
         this.paipan = paipan;
     }
 
     // 设置回调函数
-    setCallbacks(onTimeAdjust?: (hourDelta: number) => void) {
+    setCallbacks(onTimeAdjust?: (hourDelta: number) => void, onHourPillarToggle?: (showHourPillar: boolean) => void) {
         this.onTimeAdjust = onTimeAdjust;
+        this.onHourPillarToggle = onHourPillarToggle;
     }
 
     // 显示结果（包含时间、四柱干支、节气等信息）
@@ -95,23 +97,59 @@ export class ResultDisplay {
         const hourPlusBtn = gzhRow.createEl('button', { text: '时↓' });
         hourPlusBtn.addClass('hour-adjust-btn');
 
-        // 节气信息
+        // 绑定按钮事件
+        if (this.onTimeAdjust) {
+            hourMinusBtn.addEventListener('click', () => this.onTimeAdjust!(-1));
+            hourPlusBtn.addEventListener('click', () => this.onTimeAdjust!(1));
+        }
+
+        // 时柱显示开关 - 放在同一行
+        const solarTermsRow = timeDiv.createEl('div');
+        solarTermsRow.addClass('solar-terms-row', 'ziping-flex-gap-0-mb-6-0-6-0');
+
+        // 节气信息在前
         if (data.solarTerms.previous && data.solarTerms.next) {
             const formatDateTime = (date: Date) => {
                 const hours = date.getHours().toString().padStart(2, '0');
                 const minutes = date.getMinutes().toString().padStart(2, '0');
                 return `${date.getMonth() + 1}/${date.getDate()} ${hours}:${minutes}`;
             };
-            timeDiv.createEl('p', {
+            solarTermsRow.createEl('span', {
                 text: `节气：${data.solarTerms.previous.name}${formatDateTime(data.solarTerms.previous.date)}-${data.solarTerms.next.name}${formatDateTime(data.solarTerms.next.date)}`
             });
         }
 
-        // 绑定按钮事件
-        if (this.onTimeAdjust) {
-            hourMinusBtn.addEventListener('click', () => this.onTimeAdjust!(-1));
-            hourPlusBtn.addEventListener('click', () => this.onTimeAdjust!(1));
-        }
+        // 创建一个checkbox
+        const checkboxContainer = solarTermsRow.createEl('div', { cls: 'ziping-flex-gap-0' });
+        checkboxContainer.addClass('ziping-margin-left-10','ziping-flex-gap-0-mb-6-0-6-0');
+        const hourPillarCheckbox = checkboxContainer.createEl('input', { type: 'checkbox' });
+        hourPillarCheckbox.addClass('ziping-switch-checkbox');
+        hourPillarCheckbox.checked = data.showHourPillar !== false;
+        const hideshizhuCheckbox = checkboxContainer.createEl('span', { text: '时柱' });
+        hideshizhuCheckbox.addClass('ziping-flex-nowrap');
+
+        // 简单的事件处理
+        const handleToggle = (isChecked: boolean) => {
+            // console.log('时柱checkbox状态变化:', isChecked);
+            data.showHourPillar = isChecked;
+            if (this.onHourPillarToggle) {
+                this.onHourPillarToggle(isChecked);
+            }
+        };
+
+        // checkbox变化事件
+        hourPillarCheckbox.addEventListener('change', function () {
+            handleToggle(this.checked);
+        });
+
+        // 标签点击事件 - 直接切换checkbox
+        checkboxContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (e.target !== hourPillarCheckbox) {
+                hourPillarCheckbox.checked = !hourPillarCheckbox.checked;
+                hourPillarCheckbox.dispatchEvent(new Event('change'));
+            }
+        });
     }
 
     // 获取农历日期信息

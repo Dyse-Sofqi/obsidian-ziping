@@ -55,9 +55,9 @@
 
 /* 八字排盘表格样式 */
 #bazi-result table {
-    width: min-content !important;
+    width: min-content;
     border-collapse: collapse;
-    border: 1px solid #ccc !important;
+    border: 1px solid #ccc;
     white-space: nowrap;
 }
 
@@ -67,7 +67,7 @@
     gap: 1px;
     margin-top: 5px;
     padding: 0px 20px;
-    border: transparent solid 1px !important;
+    border: transparent solid 1px;
 }
 
 .save-btn-btn,
@@ -257,7 +257,7 @@
 
 .time-adjust-container input[type="text"],
 .time-adjust-container select {
-    border-radius: 0 !important;
+    border-radius: 0;
 }
 
 .time-adjust-row {
@@ -269,35 +269,40 @@
 #bazi-result .bazi-table th:nth-child(3) td,
 #bazi-result .bazi-table tr:nth-child(4) td,
 #bazi-result .bazi-table th:nth-child(4) td {
-    padding: 8px 8px !important;
+    padding: 8px 8px;
 }
 
 #bazi-result th,
 #bazi-result td {
-    border: none !important;
+    border: none;
     padding: 6px 8px;
     text-align: center;
     line-height: 1;
 }
 
+/* 表格整体样式（包括表头和单元格） */
+#bazi-result .ziping-table-cell.ziping-border-left {
+    border-left: 1px solid #ccc;
+}
+
 /* 首行标题 */
 #bazi-result th {
-    background-color: transparent !important;
+    background-color: transparent;
     font-weight: bold;
-    border-bottom: 1px solid #ccc !important;
+    border-bottom: 1px solid #ccc;
 }
 
 /* 时柱与大运列之间的框线（第5列和第6列之间，时柱是第5列，大运是第6列） */
-#bazi-result tr td:nth-child(6),
+/* #bazi-result tr td:nth-child(6),
 #bazi-result tr:nth-child(3) th:nth-child(6) {
-    border-left: 1px solid #ccc !important;
-}
+    border-left: 1px solid #ccc;
+} */
 
 /* 首列 */
 #bazi-result tr td:first-child {
     font-weight: bold;
-    background-color: transparent !important;
-    border-right: 1px solid #ccc !important;
+    background-color: transparent;
+    border-right: 1px solid #ccc;
 }
 
 /* 天干行高亮和字体样式（排除第一列栏首） */
@@ -408,43 +413,61 @@
 }
 
 /* 1. 基础复选框样式：隐藏原生样式，画成圆角矩形条 */
+.solar-terms-row .ziping-switch-checkbox,
 .tab-content .ziping-switch-checkbox {
+    --webkit-appearance: none;
+    /* 移除浏览器默认的复选框样式（小方框）。 */
     appearance: none;
-    width: 44px;
-    height: 24px;
+    /* 设置开关的宽度（整个滑轨的宽度）。 */
+    width: 36px;
+    height: 20px;
     background-color: #ccc;
-    border-radius: 24px;
+    border-radius: 20px;
+    /* 设置相对定位，为内部的绝对定位伪元素（白色圆点）提供参照坐标系。 */
     position: relative;
-    cursor: pointer;
     transition: background-color 0.2s;
+    /* 移除点击时默认的焦点外轮廓（蓝色光圈），保持美观。 */
     outline: none;
     border: none;
 }
 
 /* 2. 白色圆点（滑块） */
+.ziping-switch-checkbox::before,
 .tab-content .ziping-switch-checkbox::before {
+    /* 伪元素必须有 content 属性才能显示。这里设为空字符串。 */
     content: "";
+    /* 绝对定位，相对于父元素（.switch）的位置来放置。 */
     position: absolute;
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     border-radius: 50%;
     background-color: white;
+    /* 距离父容器顶部的距离。这里设为 2px，使圆点上下有 2px 空隙，视觉居中（父高 24px，圆点高 20px，上下各 2px）。 */
     top: 2px;
+    /* 距离父容器左侧的距离，关闭时圆点靠左，留 2px 边距。 */
     left: 2px;
     transition: transform 0.2s;
 }
-body .tab-content .ziping-switch-checkbox:checked:after {
-    --webkit-appearance: none;
-    appearance: none;
+.solar-terms-row .ziping-switch-checkbox:checked:after,
+.tab-content .ziping-switch-checkbox:checked:after {
+    content: none;
 }
 
-
 /* 3. 选中（开启）状态：改变背景色 */
+.solar-terms-row .ziping-switch-checkbox:checked,
 .tab-content .ziping-switch-checkbox:checked {
   background-color: var(--interactive-accent); 
 }
 
 /* 4. 选中时圆点向右滑动 */
+.solar-terms-row .ziping-switch-checkbox:checked::before,
 .tab-content .ziping-switch-checkbox:checked::before {
-  transform: translateX(20px);
+  transform: translateX(16px);
+}
+
+.ziping-margin-left-10 {
+    margin-left: 10px;
+}
+.ziping-margin-right-10 {
+    margin-right: 10px;
 }

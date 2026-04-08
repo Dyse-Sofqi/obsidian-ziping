@@ -51,8 +51,10 @@ export class DayunDisplay {
             displayText = `大运：${selectedDayunForDisplay.gz}。流年：${selectedLiunianYear}年${liuNianGanZhi.gan}${liuNianGanZhi.zhi}，${age}岁`;
         }
 
-        // 大运信息
-        dayunDiv.createEl('p', { text: `起运：${data.dayun.startAge}岁。${data.dayun.qyy_desc2 ? ' ' + data.dayun.qyy_desc2 : ''}` });
+        // 起运显示 - 直接使用paipan.js计算完成的数据
+        const qiyunText = `起运：${data.dayun.qyy_desc ? data.dayun.qyy_desc : ''}，${data.dayun.startAge}岁。`;
+        dayunDiv.createEl('p', { text: qiyunText });
+        dayunDiv.createEl('p', { text: `交运：${data.dayun.qyy_desc2 ? data.dayun.qyy_desc2 : ''}`});
         dayunDiv.createEl('p', { text: displayText });
 
         // 大运列表

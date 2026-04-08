@@ -71,10 +71,18 @@ export class BaziView extends ItemView {
             this.loadPaiPanFromCode(code, name);
         });
         
-        // 设置时间调整回调
-        this.resultDisplay.setCallbacks((hourDelta: number) => {
-            this.adjustHour(hourDelta);
-        });
+        // 设置时间调整和时柱显示回调
+        this.resultDisplay.setCallbacks(
+            (hourDelta: number) => {
+                this.adjustHour(hourDelta);
+            },
+            (showHourPillar: boolean) => {
+                if (this.currentData) {
+                    this.currentData.showHourPillar = showHourPillar;
+                    this.refreshDisplay();
+                }
+            }
+        );
         
         // 设置大运显示回调
         this.dayunDisplay.setCallbacks(
@@ -167,7 +175,13 @@ export class BaziView extends ItemView {
         const minute = now.getMinutes();
         const second = now.getSeconds();
         
-        void this.updateBaziDisplay(year, month, day, hour, minute, second);
+        // 传递当前的性别信息，确保起运时间正确计算
+        const gender = this.currentData?.gender ?? 0;
+        const name = this.currentData?.name ?? '';
+        const timeCorrectionEnabled = this.currentData?.timeCorrectionEnabled ?? false;
+        const tag = this.currentData?.tag ?? '';
+        
+        void this.updateBaziDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled, tag);
     }
     
     // 更新八字显示
@@ -209,6 +223,7 @@ export class BaziView extends ItemView {
         if (preserveSelection && this.currentData) {
             baziData.selectedDayunIndex = this.currentData.selectedDayunIndex;
             baziData.selectedLiunianIndex = this.currentData.selectedLiunianIndex;
+            baziData.showHourPillar = this.currentData.showHourPillar;
         }
         
         // 更新当前数据

@@ -1,3 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 // 类型定义
 declare global {
     interface Window {
@@ -17,6 +22,9 @@ interface PaipanEngine {
     dxd: string[];
     ctg: string[];
     cdz: string[];
+    calculateQiyunSimplified?: (birthTimestamp: number, solarTermTimestamp: number, xb: number, yearGan: string) => { years: number; months: number; days: number; description: string };
+    dateTimeToTimestamp?: (year: number, month: number, day: number, hour: number, minute: number, second: number) => number;
+
 }
 
 interface PaipanResult {
@@ -27,6 +35,7 @@ interface PaipanResult {
     dy?: DayunItemData[];
     zty?: number;
     pty?: number;
+    qyy_desc?: string;
     qyy_desc2?: string;
 }
 
@@ -48,6 +57,9 @@ export interface BaziResult {
 export interface SolarTerm {
     name: string;
     date: Date;
+    jr?: number[];
+    jd?: number;
+    value?: number;
 }
 
 export interface NearbySolarTerms {
@@ -74,6 +86,7 @@ export interface CurrentDayunData {
     currentDayun: DayunItem;
     liunian: number;
     allDayun: DayunItem[];
+    qyy_desc?: string;
     qyy_desc2?: string;
 }
 
@@ -88,7 +101,7 @@ export class Paipan {
         if (!window.p) {
             // 如果 window.p 不存在，尝试从 window.paipan 创建
             if (typeof window.paipan === 'function') {
-                window.p = new (window.paipan as any)();
+                window.p = new window.paipan();
             } else {
                 throw new Error('排盘引擎未初始化，请确保 paipan.js 已被正确加载');
             }
@@ -101,10 +114,22 @@ export class Paipan {
     private jdToDate(jd: number): Date {
         const utc = this.engine.Jtime(jd); // [Y,M,D,h,mi,s]
         if (!utc || !Array.isArray(utc) || utc.length < 6) {
-            return new Date(NaN);
+            // 降级实现：使用简单的JD到Date转换
+            return new Date((jd - 2440587.5) * 86400000);
         }
         const [y, m, d, h, min, s] = utc;
         return new Date(y, m - 1, d, h, min, s);
+    }
+
+    private dateToJRArray(date: Date): number[] {
+        return [
+            date.getFullYear(),
+            date.getMonth() + 1,
+            date.getDate(),
+            date.getHours(),
+            date.getMinutes(),
+            date.getSeconds()
+        ];
     }
 
     fatemaps(xb: number, yy: number, mm: number, dd: number, hh: number, mt: number, ss: number, timeCorrectionEnabled?: boolean): BaziResult {
@@ -140,13 +165,35 @@ export class Paipan {
 
     getSolarTerms(yy: number): SolarTerm[] {
         const jq = this.engine.GetAdjustedJQ(yy, false);
-        if (!Array.isArray(jq)) {
+        if (!Array.isArray(jq) || jq.length < 24) {
             return [];
         }
-        return jq.slice(0, 24).map((jd: number, index: number) => ({
-            name: this.engine.jq[index] || '未知节气',
-            date: this.jdToDate(jd)
-        }));
+        
+        const solarTerms: SolarTerm[] = [];
+        for (let i = 0; i < 24; i++) {
+            const jd = jq[i];
+            if (typeof jd !== 'number' || isNaN(jd)) {
+                continue;
+            }
+            
+            const termDate = this.jdToDate(jd);
+            // 获取完整的JD时间数组 [年, 月, 日, 时, 分, 秒]
+            const jr = this.engine.Jtime ? this.engine.Jtime(jd) : [];
+            
+            const jqName = (this.engine.jq && Array.isArray(this.engine.jq) && i < this.engine.jq.length 
+                ? this.engine.jq[i] 
+                : `节气${i+1}`) || `节气${i+1}`;
+            
+            solarTerms.push({
+                name: jqName,
+                date: termDate,
+                jr: Array.isArray(jr) && jr.length === 6 ? jr : this.dateToJRArray(termDate), // 确保jr完整性
+                jd: jd,
+                value: jd
+            });
+        }
+        
+        return solarTerms;
     }
 
     getNearbySolarTerms(yy: number, mm: number, dd: number): NearbySolarTerms {
@@ -175,13 +222,19 @@ export class Paipan {
         };
     }
 
-    getCurrentDayun(birthYear: number, birthMonth: number, birthDay: number, gender: number): CurrentDayunData {
-        const rt = this.engine.fatemaps(gender, birthYear, birthMonth, birthDay, 12, 0, 0, this.J, this.W);
+    getCurrentDayun(birthYear: number, birthMonth: number, birthDay: number, gender: number, birthHour?: number, birthMinute?: number, birthSecond?: number, existingResult?: any): CurrentDayunData {
+        // 使用用户提供的出生时间参数，如果未提供则使用合理默认值
+        const hour = birthHour !== undefined && birthHour >= 0 && birthHour <= 23 ? birthHour : 12;
+        const minute = birthMinute !== undefined && birthMinute >= 0 && birthMinute <= 59 ? birthMinute : 30;
+        const second = birthSecond !== undefined && birthSecond >= 0 && birthSecond <= 59 ? birthSecond : 0;
+        
+        // 如果已有计算结果，则直接使用，避免重复计算
+        const rt = existingResult || this.engine.fatemaps(gender, birthYear, birthMonth, birthDay, hour, minute, second, this.J, this.W);
         if (!rt || !rt.dy) {
             throw new Error('大运调用失败: 未获取 dy 数据');
         }
 
-        const allDayun: DayunItem[] = rt.dy.slice(0, 9).map(item => ({
+        const allDayun: DayunItem[] = rt.dy.slice(0, 9).map((item: any) => ({
             age: item.zqage,
             startYear: birthYear + item.zqage,  // 换运年份 = 出生年份 + 起始岁数
             gan: item.zfma,
@@ -190,11 +243,11 @@ export class Paipan {
         }));
 
         const now = new Date();
-        const age = now.getFullYear() - birthYear;
+        const age = now.getFullYear() - birthYear + 1;
         let currentDayun = allDayun[0];
 
         for (let i = 0; i < rt.dy.length; i++) {
-            const item = rt.dy[i];
+            const item: any = rt.dy[i];
             if (item && typeof item.zqage === 'number' && typeof item.zboz === 'number') {
                 if (age >= item.zqage && age <= item.zboz) {
                     currentDayun = {
@@ -218,6 +271,7 @@ export class Paipan {
 				currentDayun,
 				liunian: now.getFullYear(),
 				allDayun,
+				qyy_desc: rt.qyy_desc,
 				qyy_desc2: rt.qyy_desc2
 		};
     }
@@ -398,6 +452,148 @@ export class Paipan {
         }
         
         return result;
+    }
+
+    /**
+     * 简化版起运计算函数 - 调用paipan.js引擎的起运计算
+     * 
+     * @param birthTimestamp 出生时间戳（毫秒）
+     * @param solarTermTimestamp 节令时间戳（毫秒）
+     * @param xb 性别（0=男，1=女）
+     * @param yearGan 年干（判断顺逆排大运）
+     * @returns 起运描述信息
+     */
+    calculateQiyunSimplified(
+        birthTimestamp: number, 
+        solarTermTimestamp: number, 
+        xb: number, 
+        yearGan: string
+    ): { years: number; months: number; days: number; description: string } {
+        // 调用paipan.js引擎的起运计算函数
+        if (this.engine.calculateQiyunSimplified) {
+            return this.engine.calculateQiyunSimplified(birthTimestamp, solarTermTimestamp, xb, yearGan);
+        } else {
+            throw new Error('起运计算失败');
+        }
+    }
+
+    /**
+     * 将标准日期时间转换为时间戳
+     * @param year 年
+     * @param month 月
+     * @param day 日
+     * @param hour 小时
+     * @param minute 分钟
+     * @param second 秒数
+     * @returns UNIX时间戳（毫秒）
+     */
+    dateTimeToTimestamp(year: number, month: number, day: number, hour: number, minute: number, second: number): number {
+        if (this.engine.dateTimeToTimestamp) {
+            return this.engine.dateTimeToTimestamp(year, month, day, hour, minute, second) * 1000;
+        }
+        // 降级实现
+        const date = new Date(year, month - 1, day, hour, minute, second);
+        return date.getTime();
+    }
+
+    /**
+     * 将节令日期时间转换为时间戳
+     * @param jqArray 节气数组 [年, 月, 日, 时, 分, 秒]
+     * @param jdValue JD值
+     * @returns UNIX时间戳（毫秒）
+     */
+    jqDateTimeToTimestamp(jqArray: number[], jdValue: number): number {
+        if (this.engine.dateTimeToTimestamp && jqArray.length === 6) {
+            // 确保数组元素都不是undefined
+            const year = jqArray[0] ?? 0;
+            const month = jqArray[1] ?? 1;
+            const day = jqArray[2] ?? 1;
+            const hour = jqArray[3] ?? 0;
+            const minute = jqArray[4] ?? 0;
+            const second = jqArray[5] ?? 0;
+            return this.engine.dateTimeToTimestamp(year, month, day, hour, minute, second) * 1000;
+        }
+        // 降级实现 - 从JD值计算出日期
+        const jd = jdValue + 2440587.5; // 转换为Unix时间戳的基础偏移
+        const date = new Date(jd * 86400000);
+        return date.getTime();
+    }
+
+    /**
+     * 查找出生日期前后的节令
+     * @param birthYear 出生年份
+     * @param birthMonth 出生月份
+     * @param birthDay 出生日
+     * @param hour 出生小时（用于准确定位）
+     * @param minute 出生分钟
+     * @param second 出生秒数
+     * @param xb 性别（0=男，1=女）
+     * @param yearGan 年干（判断顺逆排大运）
+     * @returns 起运计算相关信息
+     */
+    calculateQiyunAdvanced(
+        birthYear: number,
+        birthMonth: number,
+        birthDay: number,
+        hour?: number,
+        minute?: number,
+        second?: number,
+        xb?: number,
+        yearGan?: string
+    ): { 
+        previousSolarTerm: SolarTerm | null; 
+        nextSolarTerm: SolarTerm | null;
+        qiyunInfo: { years: number; months: number; days: number; description: string } | null;
+    } {
+        const birthDate = new Date(birthYear, birthMonth - 1, birthDay, hour || 12, minute || 30, second || 0);
+        
+        // 获取相关节气信息
+        const nearby = this.getNearbySolarTerms(birthYear, birthMonth, birthDay);
+        
+        // 如果没有找到相关的节气，返回空值
+        if (!nearby.previous && !nearby.next) {
+            return {
+                previousSolarTerm: null,
+                nextSolarTerm: null,
+                qiyunInfo: null
+            };
+        }
+        
+        let qiyunInfo = null;
+        
+        // 如果有年干和性别信息，进行完整的起运计算
+        if (yearGan && xb !== undefined && nearby.previous && nearby.next) {
+            const birthTimestamp = birthDate.getTime();
+            
+            // 判断大运顺排还是逆排
+            const yangGan = ['甲', '丙', '戊', '庚', '壬'];
+            const isYangGan = yangGan.includes(yearGan);
+            const isMale = xb === 0;
+            
+            // 阳年男或阴年女 → 顺排；阴年男或阳年女 → 逆排
+            const isForward = (isYangGan && isMale) || (!isYangGan && !isMale);
+            
+            // 根据顺逆排决定使用哪个节气作为计算基准
+            const solarTerm = isForward ? nearby.next : nearby.previous;
+            const solarTermTimestamp = solarTerm.date.getTime();
+            
+            try {
+                qiyunInfo = this.calculateQiyunSimplified(
+                    birthTimestamp,
+                    solarTermTimestamp,
+                    xb,
+                    yearGan
+                );
+            } catch (error) {
+                console.warn('起运计算失败:', error);
+            }
+        }
+        
+        return {
+            previousSolarTerm: nearby.previous,
+            nextSolarTerm: nearby.next,
+            qiyunInfo
+        };
     }
 
     // 计算小运 - 男顺女逆
