@@ -41,14 +41,14 @@ export class DayunDisplay {
             const xiaoYun = this.paipan.getXiaoYun(hourGan, hourZhi, data.year, data.gender, age);
             const selectedLiunianYear = data.year + (data.selectedLiunianIndex ?? 0);
             const liuNianGanZhi = this.paipan.getYearGanZhi(selectedLiunianYear);
-            displayText = `小运：${xiaoYun.gan}${xiaoYun.zhi}。流年：${xiaoyunYear}年${liuNianGanZhi.gan}${liuNianGanZhi.zhi}，${age}岁`;
+            displayText = `小运：${xiaoYun.gan}${xiaoYun.zhi}。流年：${xiaoyunYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}年，${age}岁`;
         } else {
             const selectedDayunForDisplay = data.dayun.allDayun[data.selectedDayunIndex ?? 0] || data.dayun.currentDayun;
             const selectedLiunianIndex = data.selectedLiunianIndex ?? 0;
             const selectedLiunianYear = selectedDayunForDisplay.startYear + selectedLiunianIndex;
             const age = selectedLiunianYear - data.year + 1;
             const liuNianGanZhi = this.paipan.getYearGanZhi(selectedLiunianYear);
-            displayText = `大运：${selectedDayunForDisplay.gz}。流年：${selectedLiunianYear}年${liuNianGanZhi.gan}${liuNianGanZhi.zhi}，${age}岁`;
+            displayText = `大运：${selectedDayunForDisplay.gz}。流年：${selectedLiunianYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}年，${age}岁`;
         }
 
         // 起运显示 - 直接使用paipan.js计算完成的数据

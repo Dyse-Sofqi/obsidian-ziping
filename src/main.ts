@@ -1,5 +1,10 @@
-import {App, Notice, Plugin, WorkspaceLeaf} from 'obsidian';
-import {DEFAULT_SETTINGS, ZipingSettings, ZipingSettingTab} from "./settings";
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { App, Notice, Plugin, WorkspaceLeaf } from 'obsidian';
+import { DEFAULT_SETTINGS, ZipingSettings, ZipingSettingTab } from "./settings";
 import { BaziView } from './ui/BaziView-simplified';
 import { PAIPAN_VIEW_TYPE } from './models/types';
 import { Paipan } from './Paipan';
@@ -82,31 +87,28 @@ export default class ZipingPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-    async saveBaziToFile(title: string, data: any) {
-        const basePath = this.settings.casePath || '命例';
-        
-        // 根据校时状态选择正确的时间来计算排盘码
-        const hour = data.timeCorrectionEnabled && data.bazi.zty ? data.bazi.zty.hour : data.hour;
-        const minute = data.timeCorrectionEnabled && data.bazi.zty ? data.bazi.zty.minute : data.minute;
-        
-        // 生成排盘码
-        const identificationService = new IdentificationService(this.app, new Paipan(), new BaziService(new Paipan()));
-        const paiPanCode = identificationService.generatePaiPanCode(
-            data.year, 
-            data.month, 
-            data.day, 
-            hour, 
-            minute, 
-            data.gender
-        );
-        
-        // 如果当前title是默认值，则使用排盘码+未命名格式
-        const isDefaultTitle = !title || title === '未命名' || title === '命例';
-        const fileName = isDefaultTitle ? 
-            `${paiPanCode}，未命名.md` : 
-            `${title}.md`;
-        
-        const filePath = `${basePath}/${fileName}`;
+	async saveBaziToFile(title: string, data: any) {
+		const basePath = this.settings.casePath || '命例';
+
+		// 根据校时状态选择正确的时间来计算排盘码
+		const hour = data.timeCorrectionEnabled && data.bazi.zty ? data.bazi.zty.hour : data.hour;
+		const minute = data.timeCorrectionEnabled && data.bazi.zty ? data.bazi.zty.minute : data.minute;
+
+		// 生成排盘码
+		const identificationService = new IdentificationService(this.app, new Paipan(), new BaziService(new Paipan()));
+		const paiPanCode = identificationService.generatePaiPanCode(
+			data.year,
+			data.month,
+			data.day,
+			hour,
+			minute,
+			data.gender
+		);
+
+		// 如果当前title是默认值，则使用排盘码+未命名格式
+		const isDefaultTitle = !title || title === '未命名' || title === '命例';
+		const fileName = isDefaultTitle ? `${paiPanCode}，未命名.md` : `${title}.md`;
+		const filePath = `${basePath}/${fileName}`;
 
 		try {
 			// 检查并创建文件夹
@@ -165,30 +167,28 @@ export default class ZipingPlugin extends Plugin {
 		// 3. 使用Paipan类获取十神，确保与BaziView.ts中显示一致
 		const paipan = new Paipan();
 		const riZhuGan = data.bazi.gztg[2];
-		
+
 		// 获取完整十神名称
 		const nianGanShiShenFull = paipan.getShiShenFull(riZhuGan, data.bazi.gztg[0]);
 		const yueGanShiShenFull = paipan.getShiShenFull(riZhuGan, data.bazi.gztg[1]);
 		const shiGanShiShenFull = paipan.getShiShenFull(riZhuGan, data.bazi.gztg[3]);
-		
+
 		// 转换为简写
 		const nianGanShiShen = this.getShiShenShortFromFull(nianGanShiShenFull);
 		const yueGanShiShen = this.getShiShenShortFromFull(yueGanShiShenFull);
 		const shiGanShiShen = this.getShiShenShortFromFull(shiGanShiShenFull);
-		
-		// 5. 第四行展示十神简写
+
+		// 5. 展示十神简写
 		lines.push(`${nianGanShiShen}${yueGanShiShen}〇${shiGanShiShen}`);
 
-		// 6. 第五行展示天干
+		// 6. 展示天干
 		lines.push(`${data.bazi.gztg[0]}${data.bazi.gztg[1]}${data.bazi.gztg[2]}${data.bazi.gztg[3]}`);
 
-		// 7. 第六行展示地支
+		// 7. 展示地支
 		lines.push(`${data.bazi.dz[0]}${data.bazi.dz[1]}${data.bazi.dz[2]}${data.bazi.dz[3]}`);
 
-		// 8. 第七行展示九部大运干支
+		// 8. 展示九部大运干支
 		const dayunItems = data.dayun.allDayun.slice(0, 9) as any[];
-		// const dayunGanZhi = dayunItems.map((dy) => `${dy.gan}${dy.zhi}`).join('、');
-		// lines.push(`大运：${dayunGanZhi}`);
 
 		lines.push('');
 		// 9. 生成大运列表，每行展示一个大运的起始年份和干支和岁数

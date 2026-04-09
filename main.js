@@ -2426,10 +2426,6 @@ function paipan() {
         throw new Error("\u8282\u6C14\u53C2\u6570\u5305\u542B\u65E0\u6548\u503C");
       }
       var solarTermTimestamp = this.dateTimeToTimestamp(solarTermDateTime[0], solarTermDateTime[1], solarTermDateTime[2], solarTermDateTime[3], solarTermDateTime[4], solarTermDateTime[5]);
-      console.log("\u51FA\u751F\u65F6\u95F4\u6233:", birthTimestamp, "\u5BF9\u5E94\u65F6\u95F4:", new Date(birthTimestamp).toLocaleString());
-      console.log("\u8282\u6C14\u65F6\u95F4\u6233:", solarTermTimestamp, "\u5BF9\u5E94\u65F6\u95F4:", new Date(solarTermTimestamp).toLocaleString());
-      console.log("\u65F6\u95F4\u6233\u5DEE\u503C(\u79D2):", Math.abs(solarTermTimestamp - birthTimestamp) / 1e3);
-      console.log("\u65F6\u95F4\u6233\u5DEE\u503C(\u5929):", Math.abs(solarTermTimestamp - birthTimestamp) / (24 * 60 * 60 * 1e3));
       qiyunResult = this.calculateQiyunSimplified(birthTimestamp, solarTermTimestamp, isForward);
     } catch (error) {
       console.warn("\u8D77\u8FD0\u8BA1\u7B97\u5931\u8D25", error);
@@ -2544,9 +2540,6 @@ function paipan() {
     if (isMilliseconds) {
       birthTimestamp = Math.floor(birthTimestamp / 1e3);
       solarTermTimestamp = Math.floor(solarTermTimestamp / 1e3);
-    }
-    if (birthTimestamp >= solarTermTimestamp) {
-      throw new Error("\u65E0\u6548\u7684\u65F6\u95F4\u6233\uFF1A\u51FA\u751F\u65F6\u95F4\u5FC5\u987B\u65E9\u4E8E\u8282\u4EE4\u65F6\u95F4");
     }
     var jqTimestamp = isForward ? solarTermTimestamp : birthTimestamp;
     var targetTimestamp = isForward ? birthTimestamp : solarTermTimestamp;
@@ -29886,21 +29879,30 @@ var Paipan = class {
       date.getSeconds()
     ];
   }
-  fatemaps(xb, yy, mm, dd, hh, mt, ss, timeCorrectionEnabled) {
-    const useTimeCorrection = timeCorrectionEnabled !== void 0 ? timeCorrectionEnabled : this.timeCorrectionEnabled;
-    const jingdu = useTimeCorrection ? this.J : void 0;
-    const weidu = useTimeCorrection ? this.W : void 0;
-    const result = this.engine.fatemaps(xb, yy, mm, dd, hh, mt, ss, jingdu, weidu);
+  fatemaps(xb, yy, mm, dd, hh, mt, ss, jingdu, weidu) {
+    const finalJingdu = jingdu !== void 0 ? jingdu : this.timeCorrectionEnabled ? this.J : void 0;
+    const finalWeidu = weidu !== void 0 ? weidu : this.timeCorrectionEnabled ? this.W : void 0;
+    const useTimeCorrection = finalJingdu !== void 0 && finalWeidu !== void 0;
+    const result = this.engine.fatemaps(xb, yy, mm, dd, hh, mt, ss, finalJingdu, finalWeidu);
     if (!result || !result.ctg || !result.cdz) {
       throw new Error("\u6392\u76D8\u5931\u8D25\uFF1Afatemaps\u65E0\u6548\u7ED3\u679C");
     }
     let zty;
-    if (useTimeCorrection && result.zty !== void 0 && Array.isArray(result.zty)) {
-      zty = {
-        hour: result.zty[3],
-        minute: result.zty[4],
-        second: result.zty[5]
-      };
+    if (useTimeCorrection && result.zty !== void 0) {
+      if (Array.isArray(result.zty) && result.zty.length >= 6) {
+        zty = {
+          hour: result.zty[3],
+          minute: result.zty[4],
+          second: result.zty[5]
+        };
+      } else if (typeof result.zty === "number") {
+        const ztyDate = new Date(result.zty * 1e3);
+        zty = {
+          hour: ztyDate.getHours(),
+          minute: ztyDate.getMinutes(),
+          second: ztyDate.getSeconds()
+        };
+      }
     }
     return {
       gztg: result.ctg,
@@ -30755,7 +30757,7 @@ var BaziService = class {
       this.paipan.J = existingData.longitude;
       this.paipan.W = existingData.latitude;
     }
-    const engineResult = this.paipan.engine.fatemaps(
+    const baziResult = this.paipan.fatemaps(
       gender,
       year,
       month,
@@ -30766,15 +30768,8 @@ var BaziService = class {
       timeCorrectionEnabled ? this.paipan.J : void 0,
       timeCorrectionEnabled ? this.paipan.W : void 0
     );
-    const baziResult = {
-      gztg: engineResult.ctg,
-      dz: engineResult.cdz,
-      nyy: engineResult.nyy || [0, 0],
-      nwx: engineResult.nwx || [0, 0, 0, 0, 0],
-      zty: engineResult.zty
-    };
     const solarTerms = this.getNearbySolarTerms(year, month, day);
-    const dayunData = this.calculateDayun(gender, year, month, day, hour, engineResult);
+    const dayunData = this.calculateDayun(gender, year, month, day, hour);
     const currentYear = (/* @__PURE__ */ new Date()).getFullYear();
     let selectedDayunIndex = 0;
     let selectedLiunianIndex = 0;
@@ -30789,7 +30784,7 @@ var BaziService = class {
       }
       const firstDayun = dayunData.allDayun[0];
       if (firstDayun && currentYear < birthYear + firstDayun.age) {
-        selectedDayunIndex = 0;
+        selectedDayunIndex = -1;
         selectedLiunianIndex = Math.max(0, currentYear - birthYear);
       }
     }
@@ -30834,9 +30829,9 @@ var BaziService = class {
     }
   }
   // 计算大运流年
-  calculateDayun(gender, year, month, day, hour, engineResult) {
+  calculateDayun(gender, year, month, day, hour) {
     try {
-      return this.paipan.getCurrentDayun(year, month, day, gender, hour, void 0, void 0, engineResult);
+      return this.paipan.getCurrentDayun(year, month, day, gender, hour);
     } catch (error) {
       console.error("\u8BA1\u7B97\u5927\u8FD0\u6D41\u5E74\u5931\u8D25:", error);
       return {
@@ -31323,9 +31318,7 @@ var TimeSettingModal = class extends import_obsidian4.Modal {
     }
     const timeCorrectionContainer = tabContent.createEl("div");
     timeCorrectionContainer.addClass("ziping-flex-gap-0-mb-6-0-6-0");
-    const timeCorrectionCheckbox = timeCorrectionContainer.createEl("input", {
-      type: "checkbox"
-    });
+    const timeCorrectionCheckbox = timeCorrectionContainer.createEl("input", { type: "checkbox" });
     timeCorrectionCheckbox.id = "time-correction-checkbox";
     timeCorrectionCheckbox.addClass("ziping-switch-checkbox");
     const timeCorrectionLabel = timeCorrectionContainer.createEl("label", { text: "\u6821\u65F6" });
@@ -31358,10 +31351,10 @@ var TimeSettingModal = class extends import_obsidian4.Modal {
         PROVINCE_CITY_DISTRICT_GROUPS.forEach((group) => {
           provinceSelect.createEl("option", { text: group.province.name, value: group.province.name });
         });
-        const currentCity = "";
-        let initialProvinceName = "";
+        const currentCity = (currentData == null ? void 0 : currentData.city) || "";
+        let initialProvinceName = (currentData == null ? void 0 : currentData.province) || "";
         let initialCityName = currentCity;
-        let initialDistrictName = "";
+        let initialDistrictName = (currentData == null ? void 0 : currentData.district) || "";
         outer: for (const group of PROVINCE_CITY_DISTRICT_GROUPS) {
           for (const city of group.cities) {
             if (city.name === currentCity) {
@@ -31454,54 +31447,69 @@ var TimeSettingModal = class extends import_obsidian4.Modal {
       const selectedDistrict = districtSelect.value;
       let selectedCityName = citySelect.value;
       let selectedProvinceName = provinceSelect.value;
+      const timeCorrectionEnabledState = timeCorrectionCheckbox.checked;
       let longitude;
       let latitude;
-      console.debug("\u7528\u6237\u9009\u62E9\u7684\u5730\u7406\u4F4D\u7F6E:", {
+      console.debug("\u7528\u6237\u64CD\u4F5C\u72B6\u6001:", {
         \u7701\u4EFD: selectedProvinceName,
         \u57CE\u5E02: selectedCityName,
-        \u533A\u53BF: selectedDistrict
+        \u533A\u53BF: selectedDistrict,
+        \u6821\u65F6\u542F\u7528: timeCorrectionEnabledState
       });
-      const locationData = findLocationInGroups(selectedDistrict, selectedCityName, selectedProvinceName);
-      if (locationData) {
-        this.view.paipan.J = locationData.longitude;
-        this.view.paipan.W = locationData.latitude;
-        longitude = locationData.longitude;
-        latitude = locationData.latitude;
-        console.debug("\u7ECF\u7EAC\u5EA6\u8BBE\u7F6E\u6210\u529F:", {
-          \u7ECF\u5EA6: locationData.longitude,
-          \u7EAC\u5EA6: locationData.latitude
-        });
-        void this.view.plugin.saveSettings();
-      } else {
-        if (((_a2 = this.view.currentData) == null ? void 0 : _a2.longitude) && ((_b = this.view.currentData) == null ? void 0 : _b.latitude)) {
-          this.view.paipan.J = this.view.currentData.longitude;
-          this.view.paipan.W = this.view.currentData.latitude;
-          longitude = this.view.currentData.longitude;
-          latitude = this.view.currentData.latitude;
-          console.debug("\u4F7F\u7528\u4E0A\u6B21\u6709\u6548\u5730\u7406\u4F4D\u7F6E:", {
-            \u7ECF\u5EA6: longitude,
-            \u7EAC\u5EA6: latitude
+      if (timeCorrectionEnabledState) {
+        const locationData = findLocationInGroups(selectedDistrict, selectedCityName, selectedProvinceName);
+        if (locationData) {
+          this.view.paipan.J = locationData.longitude;
+          this.view.paipan.W = locationData.latitude;
+          longitude = locationData.longitude;
+          latitude = locationData.latitude;
+          console.debug("\u7ECF\u7EAC\u5EA6\u8BBE\u7F6E\u6210\u529F:", {
+            \u7ECF\u5EA6: locationData.longitude,
+            \u7EAC\u5EA6: locationData.latitude
           });
         } else {
-          const defaultLongitude = 116.4074;
-          const defaultLatitude = 39.9042;
-          this.view.paipan.J = defaultLongitude;
-          this.view.paipan.W = defaultLatitude;
-          longitude = defaultLongitude;
-          latitude = defaultLatitude;
-          console.debug("\u4F7F\u7528\u9ED8\u8BA4\u5730\u7406\u4F4D\u7F6E\uFF08\u5317\u4EAC\uFF09:", {
-            \u7ECF\u5EA6: defaultLongitude,
-            \u7EAC\u5EA6: defaultLatitude
-          });
+          if (((_a2 = this.view.currentData) == null ? void 0 : _a2.longitude) && ((_b = this.view.currentData) == null ? void 0 : _b.latitude)) {
+            this.view.paipan.J = this.view.currentData.longitude;
+            this.view.paipan.W = this.view.currentData.latitude;
+            longitude = this.view.currentData.longitude;
+            latitude = this.view.currentData.latitude;
+            console.debug("\u4F7F\u7528\u4E0A\u6B21\u6709\u6548\u5730\u7406\u4F4D\u7F6E:", { \u7ECF\u5EA6: longitude, \u7EAC\u5EA6: latitude });
+          } else {
+            const defaultLongitude = 116.4074;
+            const defaultLatitude = 39.9042;
+            this.view.paipan.J = defaultLongitude;
+            this.view.paipan.W = defaultLatitude;
+            longitude = defaultLongitude;
+            latitude = defaultLatitude;
+            console.debug("\u4F7F\u7528\u9ED8\u8BA4\u5730\u7406\u4F4D\u7F6E\uFF08\u5317\u4EAC\uFF09:", {
+              \u7ECF\u5EA6: defaultLongitude,
+              \u7EAC\u5EA6: defaultLatitude
+            });
+          }
         }
-        void this.view.plugin.saveSettings();
+        if (longitude === void 0 || latitude === void 0) {
+          longitude = 116.4074;
+          latitude = 39.9042;
+        }
+      } else {
+        longitude = void 0;
+        latitude = void 0;
+        console.debug("\u6821\u65F6\u529F\u80FD\u672A\u542F\u7528\uFF0C\u4E0D\u8BBE\u7F6E\u7ECF\u7EAC\u5EA6");
       }
+      void this.view.plugin.saveSettings();
       if (this.view.currentData) {
         this.view.currentData.province = selectedProvinceName;
         this.view.currentData.city = selectedCityName;
         this.view.currentData.district = selectedDistrict;
         this.view.currentData.longitude = longitude;
         this.view.currentData.latitude = latitude;
+        this.view.currentData.timeCorrectionEnabled = timeCorrectionEnabledState;
+        this.view.currentData.gender = gender;
+        console.debug("\u6570\u636E\u4FDD\u5B58\u5B8C\u6210:", {
+          \u7701\u5E02\u533A: `${selectedProvinceName} ${selectedCityName} ${selectedDistrict}`,
+          \u7ECF\u7EAC\u5EA6: [longitude, latitude],
+          \u6821\u65F6\u542F\u7528: timeCorrectionEnabledState
+        });
       }
       if (tabIndex === 0) {
         const timeContainer = tabContent.querySelector(".bazi-time-selectors");
@@ -31550,8 +31558,8 @@ var TimeSettingModal = class extends import_obsidian4.Modal {
       }
       const name = nameInput.value || "\u672A\u547D\u540D";
       const tag = tagSelect.value;
-      const timeCorrectionEnabled = timeCorrectionCheckbox.checked;
-      void this.view.calculateAndDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled, tag);
+      const timeCorrectionEnabledValue = timeCorrectionCheckbox.checked;
+      void this.view.calculateAndDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabledValue, tag);
       this.close();
     });
   }
@@ -31618,7 +31626,7 @@ var TimeSettingModal = class extends import_obsidian4.Modal {
     }
     const timeRow = container.createEl("div");
     timeRow.addClass("bazi-time-selectors");
-    timeRow.addClass("ziping-margin-6-0-6-0", "ziping-flex", "ziping-gap-0", "ziping-flex-align-center");
+    timeRow.addClass("ziping-flex-gap-0-mb-6-0-6-0", "ziping-flex-align-center");
     timeRow.createEl("label", { text: "\u65F6\u95F4\uFF1A" });
     const yearSelect = timeRow.createEl("select");
     yearSelect.addClass("ziping-time-selectList");
@@ -31884,10 +31892,7 @@ var TimeSettingModal = class extends import_obsidian4.Modal {
     dayGanSelect.addEventListener("change", updateHourGanByDay);
     hourZhiSelect.addEventListener("change", updateHourGanByDay);
     updateHourGanByDay();
-    const filterButton = container.createEl("button", {
-      text: "\u7B5B\u9009\u65F6\u95F4",
-      cls: "mod-cta"
-    });
+    const filterButton = container.createEl("button", { text: "\u7B5B\u9009\u65F6\u95F4", cls: "mod-cta" });
     filterButton.addClass("ziping-margin-top-20", "ziping-margin-bottom-10");
     const resultContainer = container.createEl("div", {
       cls: "bazi-filter-result"
@@ -31905,7 +31910,6 @@ var TimeSettingModal = class extends import_obsidian4.Modal {
       const isLateZi = selectedHourZhi === "\u665A\u5B50\u65F6";
       const actualHourZhi = isLateZi ? "\u5B50" : selectedHourZhi;
       resultContainer.empty();
-      resultContainer.createEl("p", { text: "\u6B63\u5728\u7B5B\u9009..." });
       setTimeout(() => {
         try {
           const results = this.view.paipan.filterBaziByFourPillars(
@@ -32189,14 +32193,14 @@ var DayunDisplay = class {
       const xiaoYun = this.paipan.getXiaoYun(hourGan, hourZhi, data.year, data.gender, age);
       const selectedLiunianYear = data.year + ((_b = data.selectedLiunianIndex) != null ? _b : 0);
       const liuNianGanZhi = this.paipan.getYearGanZhi(selectedLiunianYear);
-      displayText = `\u5C0F\u8FD0\uFF1A${xiaoYun.gan}${xiaoYun.zhi}\u3002\u6D41\u5E74\uFF1A${xiaoyunYear}\u5E74${liuNianGanZhi.gan}${liuNianGanZhi.zhi}\uFF0C${age}\u5C81`;
+      displayText = `\u5C0F\u8FD0\uFF1A${xiaoYun.gan}${xiaoYun.zhi}\u3002\u6D41\u5E74\uFF1A${xiaoyunYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}\u5E74\uFF0C${age}\u5C81`;
     } else {
       const selectedDayunForDisplay = data.dayun.allDayun[(_c = data.selectedDayunIndex) != null ? _c : 0] || data.dayun.currentDayun;
       const selectedLiunianIndex = (_d = data.selectedLiunianIndex) != null ? _d : 0;
       const selectedLiunianYear = selectedDayunForDisplay.startYear + selectedLiunianIndex;
       const age = selectedLiunianYear - data.year + 1;
       const liuNianGanZhi = this.paipan.getYearGanZhi(selectedLiunianYear);
-      displayText = `\u5927\u8FD0\uFF1A${selectedDayunForDisplay.gz}\u3002\u6D41\u5E74\uFF1A${selectedLiunianYear}\u5E74${liuNianGanZhi.gan}${liuNianGanZhi.zhi}\uFF0C${age}\u5C81`;
+      displayText = `\u5927\u8FD0\uFF1A${selectedDayunForDisplay.gz}\u3002\u6D41\u5E74\uFF1A${selectedLiunianYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}\u5E74\uFF0C${age}\u5C81`;
     }
     const qiyunText = `\u8D77\u8FD0\uFF1A${data.dayun.qyy_desc ? data.dayun.qyy_desc : ""}\uFF0C${data.dayun.startAge}\u5C81\u3002`;
     dayunDiv.createEl("p", { text: qiyunText });
@@ -32376,6 +32380,7 @@ var ResultDisplay = class {
   }
   // 显示结果（包含时间、四柱干支、节气等信息）
   displayResults(container, data) {
+    var _a2, _b, _c;
     container.empty();
     const timeDiv = container.createEl("div");
     timeDiv.addClass("bazi-time-info");
@@ -32383,17 +32388,21 @@ var ResultDisplay = class {
     let timeText = "";
     if (data.timeCorrectionEnabled && data.bazi.zty) {
       const zty = data.bazi.zty;
-      timeText = `\u516C\u5386\uFF1A${date.getFullYear()}\u5E74${data.month}\u6708${data.day}\u65E5 ${String(zty.hour).padStart(2, "0")}:${String(zty.minute).padStart(2, "0")}:${String(zty.second).padStart(2, "0")}`;
+      const hour = (_a2 = zty.hour) != null ? _a2 : data.hour;
+      const minute = (_b = zty.minute) != null ? _b : data.minute;
+      const second = (_c = zty.second) != null ? _c : data.second;
+      timeText = `\u516C\u5386\uFF1A${date.getFullYear()}\u5E74 ${data.month}\u6708${data.day}\u65E5 ${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}`;
       timeText += ` | UTC+8\uFF1A${String(data.hour).padStart(2, "0")}:${String(data.minute).padStart(2, "0")}:${String(data.second).padStart(2, "0")}`;
     } else {
-      timeText = `\u516C\u5386\uFF1A${date.getFullYear()}\u5E74${data.month}\u6708${data.day}\u65E5 ${String(data.hour).padStart(2, "0")}:${String(data.minute).padStart(2, "0")}:${String(data.second).padStart(2, "0")}`;
+      timeText = `\u516C\u5386\uFF1A${date.getFullYear()}\u5E74 ${data.month}\u6708${data.day}\u65E5 ${String(data.hour).padStart(2, "0")}:${String(data.minute).padStart(2, "0")}:${String(data.second).padStart(2, "0")}`;
     }
     timeDiv.createEl("p", { text: timeText });
     const lunarDate = this.paipan.getLunarDate(data.year, data.month, data.day);
     if (lunarDate) {
-      const lunarYearStr = lunarDate.isLeap ? `${lunarDate.year}\u5E74\u95F0${lunarDate.monthName}` : `${lunarDate.year}\u5E74${lunarDate.monthName}`;
+      const lunarYearStr = `${lunarDate.year}\u5E74`;
+      const lunarMonthStr = lunarDate.isLeap ? `\u95F0${lunarDate.monthName}` : `${lunarDate.monthName}`;
       const lunarDayStr = this.paipan.getLunarDayName(lunarDate.day);
-      timeDiv.createEl("p", { text: `\u519C\u5386\uFF1A${lunarYearStr}${lunarDayStr}` });
+      timeDiv.createEl("p", { text: `\u519C\u5386\uFF1A${lunarYearStr} ${lunarMonthStr}${lunarDayStr}` });
     } else {
       timeDiv.createEl("p", { text: `\u519C\u5386\uFF1A\u8BA1\u7B97\u5931\u8D25` });
     }
@@ -32602,7 +32611,7 @@ var BaziView2 = class extends import_obsidian5.ItemView {
   }
   // 加载当前时间的数据
   loadCurrentTime() {
-    var _a2, _b, _c, _d, _e, _f, _g, _h;
+    var _a2, _b, _c, _d;
     const now = /* @__PURE__ */ new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
@@ -32610,10 +32619,10 @@ var BaziView2 = class extends import_obsidian5.ItemView {
     const hour = now.getHours();
     const minute = now.getMinutes();
     const second = now.getSeconds();
-    const gender = (_b = (_a2 = this.currentData) == null ? void 0 : _a2.gender) != null ? _b : 0;
-    const name = (_d = (_c = this.currentData) == null ? void 0 : _c.name) != null ? _d : "";
-    const timeCorrectionEnabled = (_f = (_e = this.currentData) == null ? void 0 : _e.timeCorrectionEnabled) != null ? _f : false;
-    const tag = (_h = (_g = this.currentData) == null ? void 0 : _g.tag) != null ? _h : "";
+    const gender = 0;
+    const name = (_b = (_a2 = this.currentData) == null ? void 0 : _a2.name) != null ? _b : "";
+    const timeCorrectionEnabled = false;
+    const tag = (_d = (_c = this.currentData) == null ? void 0 : _c.tag) != null ? _d : "";
     void this.updateBaziDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled, tag);
   }
   // 更新八字显示

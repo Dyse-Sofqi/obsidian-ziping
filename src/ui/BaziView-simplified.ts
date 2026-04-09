@@ -175,10 +175,11 @@ export class BaziView extends ItemView {
         const minute = now.getMinutes();
         const second = now.getSeconds();
         
-        // 传递当前的性别信息，确保起运时间正确计算
-        const gender = this.currentData?.gender ?? 0;
+        // 回到现在时，重置为默认性别（男性）和默认设置
+        const gender = 0; // 默认男性
         const name = this.currentData?.name ?? '';
-        const timeCorrectionEnabled = this.currentData?.timeCorrectionEnabled ?? false;
+        // 回到现在时，重置校时状态为未勾选
+        const timeCorrectionEnabled = false;
         const tag = this.currentData?.tag ?? '';
         
         void this.updateBaziDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled, tag);

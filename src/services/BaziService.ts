@@ -31,7 +31,8 @@ export class BaziService {
         }
 
         // 使用排盘引擎计算八字（获取完整结果）
-        const engineResult = (this.paipan as any).engine.fatemaps(
+        // 改用Paipan的fatemaps方法，确保参数验证逻辑一致
+        const baziResult = this.paipan.fatemaps(
             gender,
             year,
             month,
@@ -39,22 +40,13 @@ export class BaziService {
             hour,
             minute,
             second,
-            timeCorrectionEnabled ? (this.paipan as any).J : undefined,
-            timeCorrectionEnabled ? (this.paipan as any).W : undefined
+            timeCorrectionEnabled ? this.paipan.J : undefined,
+            timeCorrectionEnabled ? this.paipan.W : undefined
         );
-
-        // 从完整结果中提取 BaziResult
-        const baziResult: BaziResult = {
-            gztg: engineResult.ctg,
-            dz: engineResult.cdz,
-            nyy: engineResult.nyy || [0, 0],
-            nwx: engineResult.nwx || [0, 0, 0, 0, 0],
-            zty: engineResult.zty
-        };
 
         // 获取当前节气信息、计算大运流年
         const solarTerms = this.getNearbySolarTerms(year, month, day);
-        const dayunData = this.calculateDayun(gender, year, month, day, hour, engineResult);
+        const dayunData = this.calculateDayun(gender, year, month, day, hour);
 
         // 确定当前大运索引
         const currentYear = new Date().getFullYear();
@@ -77,10 +69,10 @@ export class BaziService {
                 }
             }
             
-            // 如果没有找到包含当前年份的大运（说明还未起运），则选择第一个大运
+            // 如果没有找到包含当前年份的大运（说明还未起运），则设置为小运模式
             const firstDayun = dayunData.allDayun[0];
             if (firstDayun && currentYear < birthYear + firstDayun.age) {
-                selectedDayunIndex = 0;
+                selectedDayunIndex = -1; // -1表示小运模式
                 selectedLiunianIndex = Math.max(0, currentYear - birthYear);
             }
         }
@@ -137,12 +129,11 @@ export class BaziService {
         year: number,
         month: number,
         day: number,
-        hour: number,
-        engineResult: any
+        hour: number
     ): CurrentDayunData {
         try {
-            // 将第一次 fatemaps() 的结果传递给 getCurrentDayun() 方法，避免重复计算
-            return this.paipan.getCurrentDayun(year, month, day, gender, hour, undefined, undefined, engineResult);
+            // 直接调用Paipan的getCurrentDayun方法，底层引擎会重新计算完整结果
+            return this.paipan.getCurrentDayun(year, month, day, gender, hour);
         } catch (error) {
             console.error('计算大运流年失败:', error);
             // 返回默认值

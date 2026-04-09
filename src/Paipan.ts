@@ -3,6 +3,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import { BaziResult } from './models/types';
+
 // 类型定义
 declare global {
     interface Window {
@@ -46,13 +48,7 @@ interface DayunItemData {
     zboz?: number;
 }
 
-export interface BaziResult {
-    gztg: string[];
-    dz: string[];
-    nyy: number[];
-    nwx: number[];
-    zty?: { hour: number; minute: number; second: number }; // 真太阳时
-}
+
 
 export interface SolarTerm {
     name: string;
@@ -132,26 +128,39 @@ export class Paipan {
         ];
     }
 
-    fatemaps(xb: number, yy: number, mm: number, dd: number, hh: number, mt: number, ss: number, timeCorrectionEnabled?: boolean): BaziResult {
-        // 根据时间校准设置决定是否计算真太阳时（支持动态传入或使用默认设置）
-        const useTimeCorrection = timeCorrectionEnabled !== undefined ? timeCorrectionEnabled : this.timeCorrectionEnabled;
-        const jingdu = useTimeCorrection ? this.J : undefined;
-        const weidu = useTimeCorrection ? this.W : undefined;
+    fatemaps(xb: number, yy: number, mm: number, dd: number, hh: number, mt: number, ss: number, jingdu?: number, weidu?: number): BaziResult {
+        // 根据传入的经纬度参数决定是否使用真太阳时计算
+        // 与底层paipan.js保持一致的判断逻辑：只要J不为undefined就启用真太阳时
+        const finalJingdu = jingdu !== undefined ? jingdu : (this.timeCorrectionEnabled ? this.J : undefined);
+        const finalWeidu = weidu !== undefined ? weidu : (this.timeCorrectionEnabled ? this.W : undefined);
+        const useTimeCorrection = finalJingdu !== undefined && finalWeidu !== undefined;
         
-        const result = this.engine.fatemaps(xb, yy, mm, dd, hh, mt, ss, jingdu, weidu);
+        // 调用底层引擎，传入经纬度参数
+        const result = this.engine.fatemaps(xb, yy, mm, dd, hh, mt, ss, finalJingdu, finalWeidu);
         if (!result || !result.ctg || !result.cdz) {
             throw new Error('排盘失败：fatemaps无效结果');
         }
 
         // 获取真太阳时（仅在时间校准开启且有设置经纬度时）
         let zty: { hour: number; minute: number; second: number } | undefined;
-        if (useTimeCorrection && result.zty !== undefined && Array.isArray(result.zty)) {
-            // result.zty 是 [Y, M, D, h, mi, s] 格式，直接取小时、分钟、秒
-            zty = {
-                hour: result.zty[3] as number,
-                minute: result.zty[4] as number,
-                second: result.zty[5] as number
-            };
+        if (useTimeCorrection && result.zty !== undefined) {
+            // 处理不同的zty数据结构格式
+            if (Array.isArray(result.zty) && result.zty.length >= 6) {
+                // result.zty 是 [Y, M, D, h, mi, s] 格式，直接取小时、分钟、秒
+                zty = {
+                    hour: result.zty[3] as number,
+                    minute: result.zty[4] as number,
+                    second: result.zty[5] as number
+                };
+            } else if (typeof result.zty === 'number') {
+                // result.zty 是时间戳格式，需要转换为小时、分钟、秒
+                const ztyDate = new Date(result.zty * 1000);
+                zty = {
+                    hour: ztyDate.getHours(),
+                    minute: ztyDate.getMinutes(),
+                    second: ztyDate.getSeconds()
+                };
+            }
         }
 
         return {

@@ -167,9 +167,7 @@ export class TimeSettingModal extends Modal {
         // 校时复选框
         const timeCorrectionContainer = tabContent.createEl('div');
         timeCorrectionContainer.addClass('ziping-flex-gap-0-mb-6-0-6-0');
-        const timeCorrectionCheckbox = timeCorrectionContainer.createEl('input', {
-            type: 'checkbox'
-        });
+        const timeCorrectionCheckbox = timeCorrectionContainer.createEl('input', { type: 'checkbox' });
         timeCorrectionCheckbox.id = 'time-correction-checkbox';
         timeCorrectionCheckbox.addClass('ziping-switch-checkbox');
         const timeCorrectionLabel = timeCorrectionContainer.createEl('label', { text: '校时' });
@@ -209,7 +207,7 @@ export class TimeSettingModal extends Modal {
             } else {
                 // 勾选校时checkbox时显示整个城市选择容器
                 cityContainer.style.display = 'flex';
-                
+
                 // 重新填充省份选择器（三级联动）
                 const emptyProvinceOption = provinceSelect.createEl('option');
                 emptyProvinceOption.textContent = '省份';
@@ -220,10 +218,10 @@ export class TimeSettingModal extends Modal {
                 });
 
                 // 根据当前设置重新初始化
-                const currentCity = '';
-                let initialProvinceName = '';
+                const currentCity = currentData?.city || '';
+                let initialProvinceName = currentData?.province || '';
                 let initialCityName = currentCity;
-                let initialDistrictName = '';
+                let initialDistrictName = currentData?.district || '';
 
                 // 查找当前城市对应的省份和区县
                 outer: for (const group of PROVINCE_CITY_DISTRICT_GROUPS) {
@@ -357,65 +355,88 @@ export class TimeSettingModal extends Modal {
             let selectedCityName = citySelect.value;
             let selectedProvinceName = provinceSelect.value;
 
+            // 检查是否启用了校时功能（使用不同的变量名避免冲突）
+            const timeCorrectionEnabledState = timeCorrectionCheckbox.checked;
+
             // 保存省市区信息和经纬度
             let longitude: number | undefined;
             let latitude: number | undefined;
-            
-            // 记录当前地理位置选择
-            console.debug('用户选择的地理位置:', { 
-                省份: selectedProvinceName, 
-                城市: selectedCityName, 
-                区县: selectedDistrict 
+
+            // 记录当前地理位置选择和校时状态
+            console.debug('用户操作状态:', {
+                省份: selectedProvinceName,
+                城市: selectedCityName,
+                区县: selectedDistrict,
+                校时启用: timeCorrectionEnabledState
             });
-            
-            // 使用三级联动的完整地理信息
-            const locationData = findLocationInGroups(selectedDistrict, selectedCityName, selectedProvinceName);
-            if (locationData) {
-                // 更新排盘引擎的经纬度
-                this.view.paipan.J = locationData.longitude;
-                this.view.paipan.W = locationData.latitude;
-                longitude = locationData.longitude;
-                latitude = locationData.latitude;
-                console.debug('经纬度设置成功:', { 
-                    经度: locationData.longitude, 
-                    纬度: locationData.latitude 
-                });
-                void this.view.plugin.saveSettings();
-            } else {
-                // 如果无法找到地理数据，使用用户上次的有效地理位置或默认值
-                if (this.view.currentData?.longitude && this.view.currentData?.latitude) {
-                    // 使用上次的有效地理位置
-                    this.view.paipan.J = this.view.currentData.longitude;
-                    this.view.paipan.W = this.view.currentData.latitude;
-                    longitude = this.view.currentData.longitude;
-                    latitude = this.view.currentData.latitude;
-                    console.debug('使用上次有效地理位置:', { 
-                        经度: longitude, 
-                        纬度: latitude 
+
+            // 只有在校时功能启用时，才处理地理位置信息
+            if (timeCorrectionEnabledState) {
+                // 使用三级联动的完整地理信息
+                const locationData = findLocationInGroups(selectedDistrict, selectedCityName, selectedProvinceName);
+                if (locationData) {
+                    // 更新排盘引擎的经纬度
+                    this.view.paipan.J = locationData.longitude;
+                    this.view.paipan.W = locationData.latitude;
+                    longitude = locationData.longitude;
+                    latitude = locationData.latitude;
+                    console.debug('经纬度设置成功:', {
+                        经度: locationData.longitude,
+                        纬度: locationData.latitude
                     });
                 } else {
-                    // 使用默认位置（北京市中心）
-                    const defaultLongitude = 116.4074;
-                    const defaultLatitude = 39.9042;
-                    this.view.paipan.J = defaultLongitude;
-                    this.view.paipan.W = defaultLatitude;
-                    longitude = defaultLongitude;
-                    latitude = defaultLatitude;
-                    console.debug('使用默认地理位置（北京）:', { 
-                        经度: defaultLongitude, 
-                        纬度: defaultLatitude 
-                    });
+                    // 如果无法找到地理数据，使用用户上次的有效地理位置或默认值
+                    if (this.view.currentData?.longitude && this.view.currentData?.latitude) {
+                        // 使用上次的有效地理位置
+                        this.view.paipan.J = this.view.currentData.longitude;
+                        this.view.paipan.W = this.view.currentData.latitude;
+                        longitude = this.view.currentData.longitude;
+                        latitude = this.view.currentData.latitude;
+                        console.debug('使用上次有效地理位置:', { 经度: longitude, 纬度: latitude });
+                    } else {
+                        // 使用默认位置（北京市中心）
+                        const defaultLongitude = 116.4074;
+                        const defaultLatitude = 39.9042;
+                        this.view.paipan.J = defaultLongitude;
+                        this.view.paipan.W = defaultLatitude;
+                        longitude = defaultLongitude;
+                        latitude = defaultLatitude;
+                        console.debug('使用默认地理位置（北京）:', {
+                            经度: defaultLongitude,
+                            纬度: defaultLatitude
+                        });
+                    }
                 }
-                void this.view.plugin.saveSettings();
+
+                // 确保经纬度数据有值
+                if (longitude === undefined || latitude === undefined) {
+                    longitude = 116.4074;
+                    latitude = 39.9042;
+                }
+            } else {
+                // 校时功能未启用，清除经纬度设置
+                longitude = undefined;
+                latitude = undefined;
+                console.debug('校时功能未启用，不设置经纬度');
             }
-            
-            // 保存省市区信息到当前八字数据
+
+            void this.view.plugin.saveSettings();
+
+            // 保存省市区信息和校时状态到当前八字数据
             if (this.view.currentData) {
                 this.view.currentData.province = selectedProvinceName;
                 this.view.currentData.city = selectedCityName;
                 this.view.currentData.district = selectedDistrict;
                 this.view.currentData.longitude = longitude;
                 this.view.currentData.latitude = latitude;
+                this.view.currentData.timeCorrectionEnabled = timeCorrectionEnabledState;
+                this.view.currentData.gender = gender;
+
+                console.debug('数据保存完成:', {
+                    省市区: `${selectedProvinceName} ${selectedCityName} ${selectedDistrict}`,
+                    经纬度: [longitude, latitude],
+                    校时启用: timeCorrectionEnabledState
+                });
             }
 
             if (tabIndex === 0) {
@@ -475,8 +496,8 @@ export class TimeSettingModal extends Modal {
             // 获取姓名信息、标签和时间校准状态
             const name = nameInput.value || '未命名';
             const tag = tagSelect.value;
-            const timeCorrectionEnabled = timeCorrectionCheckbox.checked;
-            void this.view.calculateAndDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled, tag);
+            const timeCorrectionEnabledValue = timeCorrectionCheckbox.checked;
+            void this.view.calculateAndDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabledValue, tag);
             this.close();
         });
     }
@@ -563,7 +584,7 @@ export class TimeSettingModal extends Modal {
         // 创建时间选择容器，所有下拉列表在同一行
         const timeRow = container.createEl('div');
         timeRow.addClass('bazi-time-selectors');
-        timeRow.addClass('ziping-margin-6-0-6-0', 'ziping-flex', 'ziping-gap-0', 'ziping-flex-align-center');
+        timeRow.addClass('ziping-flex-gap-0-mb-6-0-6-0', 'ziping-flex-align-center');
         timeRow.createEl('label', { text: '时间：' });
 
         // 年
@@ -743,11 +764,8 @@ export class TimeSettingModal extends Modal {
 
             // 五虎遁
             const yinMonthGan: { [key: string]: string } = {
-                '甲': '丙', '己': '丙',
-                '乙': '戊', '庚': '戊',
-                '丙': '庚', '辛': '庚',
-                '丁': '壬', '壬': '壬',
-                '戊': '甲', '癸': '甲'
+                '甲': '丙', '己': '丙', '乙': '戊', '庚': '戊',
+                '丙': '庚', '辛': '庚', '丁': '壬', '壬': '壬', '戊': '甲', '癸': '甲'
             };
 
             // 地支顺序：子丑寅卯辰巳午未申酉戌亥
@@ -826,11 +844,8 @@ export class TimeSettingModal extends Modal {
 
             // 五鼠遁
             const ziHourGan: { [key: string]: string } = {
-                '甲': '甲', '己': '甲', 
-                '乙': '丙', '庚': '丙',
-                '丙': '戊', '辛': '戊',
-                '丁': '庚', '壬': '庚',
-                '戊': '壬', '癸': '壬'
+                '甲': '甲', '己': '甲', '乙': '丙', '庚': '丙',
+                '丙': '戊', '辛': '戊', '丁': '庚', '壬': '庚', '戊': '壬', '癸': '壬'
             };
 
             // 地支顺序：子丑寅卯辰巳午未申酉戌亥
@@ -860,18 +875,12 @@ export class TimeSettingModal extends Modal {
                 const ziGanIndex = ganOrder.indexOf(ziGan);
                 const hourGanIndex = (ziGanIndex + hourIndex - ziIndex + 10) % 10;
                 const calculatedHourGan = ganOrder[hourGanIndex];
-                if (calculatedHourGan) {
-                    hourGan = calculatedHourGan;
-                }
+                if (calculatedHourGan) { hourGan = calculatedHourGan; }
             }
-
             // 设置时干的选中值
-            if (hourGan) {
-                hourGanSelect.value = hourGan;
-            }
+            if (hourGan) { hourGanSelect.value = hourGan; }
         };
 
-        // 添加事件监听
         dayGanSelect.addEventListener('change', updateHourGanByDay);
         hourZhiSelect.addEventListener('change', updateHourGanByDay);
 
@@ -879,10 +888,7 @@ export class TimeSettingModal extends Modal {
         updateHourGanByDay();
 
         // 添加筛选按钮
-        const filterButton = container.createEl('button', {
-            text: '筛选时间',
-            cls: 'mod-cta'
-        });
+        const filterButton = container.createEl('button', { text: '筛选时间', cls: 'mod-cta' });
         filterButton.addClass('ziping-margin-top-20', 'ziping-margin-bottom-10');
 
         // 创建结果展示区域
@@ -907,8 +913,6 @@ export class TimeSettingModal extends Modal {
 
             // 清空结果区域
             resultContainer.empty();
-            resultContainer.createEl('p', { text: '正在筛选...' });
-
             // 使用setTimeout避免阻塞UI
             setTimeout(() => {
                 try {

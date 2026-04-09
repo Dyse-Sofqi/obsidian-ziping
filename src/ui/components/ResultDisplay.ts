@@ -31,19 +31,24 @@ export class ResultDisplay {
         let timeText = '';
         if (data.timeCorrectionEnabled && data.bazi.zty) {
             const zty = data.bazi.zty;
-            timeText = `公历：${date.getFullYear()}年${data.month}月${data.day}日 ${String(zty.hour).padStart(2, '0')}:${String(zty.minute).padStart(2, '0')}:${String(zty.second).padStart(2, '0')}`;
+            // 确保zty有hour、minute、second属性
+            const hour = zty.hour ?? data.hour;
+            const minute = zty.minute ?? data.minute;
+            const second = zty.second ?? data.second;
+            timeText = `公历：${date.getFullYear()}年 ${data.month}月${data.day}日 ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
             timeText += ` | UTC+8：${String(data.hour).padStart(2, '0')}:${String(data.minute).padStart(2, '0')}:${String(data.second).padStart(2, '0')}`;
         } else {
-            timeText = `公历：${date.getFullYear()}年${data.month}月${data.day}日 ${String(data.hour).padStart(2, '0')}:${String(data.minute).padStart(2, '0')}:${String(data.second).padStart(2, '0')}`;
+            timeText = `公历：${date.getFullYear()}年 ${data.month}月${data.day}日 ${String(data.hour).padStart(2, '0')}:${String(data.minute).padStart(2, '0')}:${String(data.second).padStart(2, '0')}`;
         }
         timeDiv.createEl('p', { text: timeText });
 
         // 获取农历信息
         const lunarDate = this.paipan.getLunarDate(data.year, data.month, data.day);
         if (lunarDate) {
-            const lunarYearStr = lunarDate.isLeap ? `${lunarDate.year}年闰${lunarDate.monthName}` : `${lunarDate.year}年${lunarDate.monthName}`;
+            const lunarYearStr = `${lunarDate.year}年`;
+            const lunarMonthStr = lunarDate.isLeap ? `闰${lunarDate.monthName}` : `${lunarDate.monthName}`;
             const lunarDayStr = this.paipan.getLunarDayName(lunarDate.day);
-            timeDiv.createEl('p', { text: `农历：${lunarYearStr}${lunarDayStr}` });
+            timeDiv.createEl('p', { text: `农历：${lunarYearStr} ${lunarMonthStr}${lunarDayStr}` });
         } else {
             timeDiv.createEl('p', { text: `农历：计算失败` });
         }
