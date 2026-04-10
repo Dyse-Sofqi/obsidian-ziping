@@ -2441,8 +2441,8 @@ function paipan() {
 		dz[3] = hgz % 12; //時支
 
 		var ob = {
-			ty: ty,
-			jr: jr
+			ty: ty, //节气年 (Jieqi Year)，表示与目标日期对应的节气年份
+			jr: jr //节气数组 (Jieqi Array)，数组中第21个元素 jr[21] 是立春日期
 		};
 		return [tg, dz, ob];
 	};
@@ -2731,12 +2731,15 @@ function paipan() {
 
 		// 确定要使用的节气（根据大运顺逆排法）
 		var targetJQ;
+		var jieLing;
 		if (forward === 0) {
 			// 顺排：使用下一个节气
 			targetJQ = adjustedJr[21 + 2 * ord + 2];
+			jieLing = adjustedJr[21 + 2 * ord];
 		} else {
 			// 逆排：使用当前节气
 			targetJQ = adjustedJr[21 + 2 * ord];
+			jieLing = adjustedJr[21 + 2 * ord];
 		}
 
 		// 使用真正的简化算法计算起运 - 完全绕过儒略日换算
@@ -2772,6 +2775,9 @@ function paipan() {
 		}
 
 		rt['qyy_desc'] = qiyunResult.description;
+		solarTermDateTime = this.Jtime(jieLing);
+		solarTermTimestamp = this.dateTimeToTimestamp(solarTermDateTime[0], solarTermDateTime[1], solarTermDateTime[2], solarTermDateTime[3], solarTermDateTime[4], solarTermDateTime[5]);
+		rt['renyuanSiling'] = this.calculateRenyuanSiling(birthTimestamp, solarTermTimestamp, ord);
 
 		// 检查是否使用新方法的起运时间戳
 		if (qiyunResult.qiyunTimestamp) {
@@ -2799,7 +2805,6 @@ function paipan() {
 
 		//求算起運年(指節氣年,农历)
 		var jqyy;
-
 		if (qiyunResult.qiyunTimestamp) {
 			// 新方法：直接根据公历日期判断节气年
 			// 立春通常是2月4-5日，在此之前属于前一年的节气年
@@ -2976,8 +2981,13 @@ function paipan() {
 		var description = "出生后" + totalYears + "年" + totalMonths + "个月" + finalDays + "天起运";
 
 		// 计算真正的起运时间戳（单位为毫秒）
-		// 注意：birthTimestamp已经是秒级，需要先转换为毫秒级
-		var qiyunTimestamp = birthTimestamp * 1000 + timeDiffSeconds * 1000;
+		// 正确的计算方法：出生时间加上起运年、月、日
+		var birthDate = new Date(birthTimestamp * 1000); // 将秒级转换为毫秒级并创建Date对象
+		var qiyunDate = new Date(birthDate);
+		qiyunDate.setFullYear(qiyunDate.getFullYear() + totalYears);
+		qiyunDate.setMonth(qiyunDate.getMonth() + totalMonths);
+		qiyunDate.setDate(qiyunDate.getDate() + finalDays);
+		var qiyunTimestamp = qiyunDate.getTime();
 
 		return {
 			years: totalYears,
@@ -2987,6 +2997,96 @@ function paipan() {
 			qiyunTimestamp: qiyunTimestamp, // 直接返回的时间戳
 			totalSeconds: timeDiffSeconds   // 总秒数差
 		};
+	};
+
+	/**
+	 * 人元司令计算函数
+	 * 根据出生时间与上一个节令（非中气）的时间差决定人元司令是哪个天干
+	 * 
+	 * @param {number} birthTimestamp 出生时间戳（支持秒级或毫秒级）
+	 * @param {number} solarTermTimestamp 节令时间戳（支持秒级或毫秒级）
+	 * @param {number} ord 节气序号（0:立春, 1:惊蛰, 2:清明, 3:立夏, 4:芒种, 5:小暑, 6:立秋, 7:白露, 8:寒露, 9:立冬, 10:大雪, 11:小寒）
+	 * @returns {string} 人元司令对应的天干（十天干之一：甲、乙、丙、丁、戊、己、庚、辛、壬、癸）
+	 */
+	this.calculateRenyuanSiling = function (birthTimestamp, solarTermTimestamp, ord) {
+		// 检查输入时间戳的有效性
+		if (!birthTimestamp || !solarTermTimestamp) {
+			throw new Error('无效的时间戳：时间戳不能为空');
+		}
+
+		// 检查 ord 参数的有效性
+		if (ord === undefined || ord === null) {
+			throw new Error('无效的节气序号：ord 参数不能为空');
+		}
+
+		if (ord < 0 || ord > 11) {
+			throw new Error('无效的节气序号：ord 参数必须在 0-11 范围内');
+		}
+
+		// 自动识别时间戳单位并统一为秒级
+		// 毫秒级时间戳通常大于1e11，秒级时间戳小于1e11
+		var isMilliseconds = birthTimestamp > 1e11 || solarTermTimestamp > 1e11;
+
+		if (isMilliseconds) {
+			// 转换毫秒级时间戳为秒级
+			birthTimestamp = Math.floor(birthTimestamp / 1000);
+			solarTermTimestamp = Math.floor(solarTermTimestamp / 1000);
+		}
+
+		// 计算与上一个节令的时间差（单位为天）
+		var timeDiffSeconds = Math.abs(birthTimestamp - solarTermTimestamp);
+		var timeDiffDays = timeDiffSeconds / 86400;
+
+		// 根据节气序号和天数阈值返回对应的天干
+		switch (ord) {
+			case 0: // 立春
+				if (timeDiffDays >= 15) return '甲';
+				if (timeDiffDays >= 7) return '丙';
+				return '戊';
+			case 1: // 惊蛰
+				if (timeDiffDays >= 10) return '乙';
+				return '甲';
+			case 2: // 清明
+				if (timeDiffDays >= 12) return '戊';
+				if (timeDiffDays >= 9) return '癸';
+				return '乙';
+			case 3: // 立夏
+				if (timeDiffDays >= 14) return '丙';
+				if (timeDiffDays >= 5) return '庚';
+				return '戊';
+			case 4: // 芒种
+				if (timeDiffDays >= 19) return '丁';
+				if (timeDiffDays >= 10) return '己';
+				return '丙';
+			case 5: // 小暑
+				if (timeDiffDays >= 12) return '己';
+				if (timeDiffDays >= 9) return '乙';
+				return '丁';
+			case 6: // 立秋
+				if (timeDiffDays >= 13) return '庚';
+				if (timeDiffDays >= 10) return '壬';
+				return '戊';
+			case 7: // 白露
+				if (timeDiffDays >= 10) return '辛';
+				return '庚';
+			case 8: // 寒露
+				if (timeDiffDays >= 12) return '戊';
+				if (timeDiffDays >= 9) return '丁';
+				return '辛';
+			case 9: // 立冬
+				if (timeDiffDays >= 12) return '壬';
+				if (timeDiffDays >= 7) return '甲';
+				return '戊';
+			case 10: // 大雪
+				if (timeDiffDays >= 10) return '癸';
+				return '壬';
+			case 11: // 小寒
+				if (timeDiffDays >= 12) return '己';
+				if (timeDiffDays >= 9) return '辛';
+				return '癸';
+			default:
+				throw new Error('未知的节气序号：ord=' + ord);
+		}
 	};
 
 	/**

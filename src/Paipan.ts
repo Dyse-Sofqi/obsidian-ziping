@@ -25,6 +25,7 @@ interface PaipanEngine {
     ctg: string[];
     cdz: string[];
     calculateQiyunSimplified?: (birthTimestamp: number, solarTermTimestamp: number, xb: number, yearGan: string) => { years: number; months: number; days: number; description: string };
+    calculateRenyuanSiling?: (birthTimestamp: number, solarTermTimestamp: number, ord: number) => string;
     dateTimeToTimestamp?: (year: number, month: number, day: number, hour: number, minute: number, second: number) => number;
 
 }
@@ -84,6 +85,7 @@ export interface CurrentDayunData {
     allDayun: DayunItem[];
     qyy_desc?: string;
     qyy_desc2?: string;
+    renyuanSiling?: string;
 }
 
 export class Paipan {
@@ -281,7 +283,8 @@ export class Paipan {
 				liunian: now.getFullYear(),
 				allDayun,
 				qyy_desc: rt.qyy_desc,
-				qyy_desc2: rt.qyy_desc2
+				qyy_desc2: rt.qyy_desc2,
+				renyuanSiling: rt.renyuanSiling
 		};
     }
 
@@ -483,6 +486,22 @@ export class Paipan {
             return this.engine.calculateQiyunSimplified(birthTimestamp, solarTermTimestamp, xb, yearGan);
         } else {
             throw new Error('起运计算失败');
+        }
+    }
+
+    /**
+     * 计算人元司令
+     * @param birthTimestamp 出生时间的时间戳（毫秒）
+     * @param solarTermTimestamp 节令（节气）的时间戳（毫秒）
+     * @param ord 排序参数
+     * @returns 人元司令的天干
+     */
+    calculateRenyuanSiling(birthTimestamp: number, solarTermTimestamp: number, ord: number): string {
+        // 调用paipan.js引擎的人元司令计算函数
+        if (this.engine.calculateRenyuanSiling) {
+            return this.engine.calculateRenyuanSiling(birthTimestamp, solarTermTimestamp, ord);
+        } else {
+            throw new Error('人元司令计算失败');
         }
     }
 

@@ -2209,7 +2209,9 @@ function paipan() {
     dz[3] = hgz % 12;
     var ob = {
       ty,
+      //节气年 (Jieqi Year)，表示与目标日期对应的节气年份
       jr
+      //节气数组 (Jieqi Array)，数组中第21个元素 jr[21] 是立春日期
     };
     return [tg, dz, ob];
   };
@@ -2406,10 +2408,13 @@ function paipan() {
       }
     }
     var targetJQ;
+    var jieLing;
     if (forward === 0) {
       targetJQ = adjustedJr[21 + 2 * ord + 2];
+      jieLing = adjustedJr[21 + 2 * ord];
     } else {
       targetJQ = adjustedJr[21 + 2 * ord];
+      jieLing = adjustedJr[21 + 2 * ord];
     }
     var qiyunResult;
     try {
@@ -2431,6 +2436,9 @@ function paipan() {
       console.warn("\u8D77\u8FD0\u8BA1\u7B97\u5931\u8D25", error);
     }
     rt["qyy_desc"] = qiyunResult.description;
+    solarTermDateTime = this.Jtime(jieLing);
+    solarTermTimestamp = this.dateTimeToTimestamp(solarTermDateTime[0], solarTermDateTime[1], solarTermDateTime[2], solarTermDateTime[3], solarTermDateTime[4], solarTermDateTime[5]);
+    rt["renyuanSiling"] = this.calculateRenyuanSiling(birthTimestamp, solarTermTimestamp, ord);
     if (qiyunResult.qiyunTimestamp) {
       var qiyunDate = new Date(qiyunResult.qiyunTimestamp);
       var qyy = qiyunDate.getFullYear();
@@ -2551,7 +2559,12 @@ function paipan() {
     var totalMonths = Math.floor(virtualDays / 30);
     var finalDays = Math.floor(virtualDays % 30);
     var description = "\u51FA\u751F\u540E" + totalYears + "\u5E74" + totalMonths + "\u4E2A\u6708" + finalDays + "\u5929\u8D77\u8FD0";
-    var qiyunTimestamp = birthTimestamp * 1e3 + timeDiffSeconds * 1e3;
+    var birthDate = new Date(birthTimestamp * 1e3);
+    var qiyunDate = new Date(birthDate);
+    qiyunDate.setFullYear(qiyunDate.getFullYear() + totalYears);
+    qiyunDate.setMonth(qiyunDate.getMonth() + totalMonths);
+    qiyunDate.setDate(qiyunDate.getDate() + finalDays);
+    var qiyunTimestamp = qiyunDate.getTime();
     return {
       years: totalYears,
       months: totalMonths,
@@ -2562,6 +2575,73 @@ function paipan() {
       totalSeconds: timeDiffSeconds
       // 总秒数差
     };
+  };
+  this.calculateRenyuanSiling = function(birthTimestamp, solarTermTimestamp, ord) {
+    if (!birthTimestamp || !solarTermTimestamp) {
+      throw new Error("\u65E0\u6548\u7684\u65F6\u95F4\u6233\uFF1A\u65F6\u95F4\u6233\u4E0D\u80FD\u4E3A\u7A7A");
+    }
+    if (ord === void 0 || ord === null) {
+      throw new Error("\u65E0\u6548\u7684\u8282\u6C14\u5E8F\u53F7\uFF1Aord \u53C2\u6570\u4E0D\u80FD\u4E3A\u7A7A");
+    }
+    if (ord < 0 || ord > 11) {
+      throw new Error("\u65E0\u6548\u7684\u8282\u6C14\u5E8F\u53F7\uFF1Aord \u53C2\u6570\u5FC5\u987B\u5728 0-11 \u8303\u56F4\u5185");
+    }
+    var isMilliseconds = birthTimestamp > 1e11 || solarTermTimestamp > 1e11;
+    if (isMilliseconds) {
+      birthTimestamp = Math.floor(birthTimestamp / 1e3);
+      solarTermTimestamp = Math.floor(solarTermTimestamp / 1e3);
+    }
+    var timeDiffSeconds = Math.abs(birthTimestamp - solarTermTimestamp);
+    var timeDiffDays = timeDiffSeconds / 86400;
+    switch (ord) {
+      case 0:
+        if (timeDiffDays >= 15) return "\u7532";
+        if (timeDiffDays >= 7) return "\u4E19";
+        return "\u620A";
+      case 1:
+        if (timeDiffDays >= 10) return "\u4E59";
+        return "\u7532";
+      case 2:
+        if (timeDiffDays >= 12) return "\u620A";
+        if (timeDiffDays >= 9) return "\u7678";
+        return "\u4E59";
+      case 3:
+        if (timeDiffDays >= 14) return "\u4E19";
+        if (timeDiffDays >= 5) return "\u5E9A";
+        return "\u620A";
+      case 4:
+        if (timeDiffDays >= 19) return "\u4E01";
+        if (timeDiffDays >= 10) return "\u5DF1";
+        return "\u4E19";
+      case 5:
+        if (timeDiffDays >= 12) return "\u5DF1";
+        if (timeDiffDays >= 9) return "\u4E59";
+        return "\u4E01";
+      case 6:
+        if (timeDiffDays >= 13) return "\u5E9A";
+        if (timeDiffDays >= 10) return "\u58EC";
+        return "\u620A";
+      case 7:
+        if (timeDiffDays >= 10) return "\u8F9B";
+        return "\u5E9A";
+      case 8:
+        if (timeDiffDays >= 12) return "\u620A";
+        if (timeDiffDays >= 9) return "\u4E01";
+        return "\u8F9B";
+      case 9:
+        if (timeDiffDays >= 12) return "\u58EC";
+        if (timeDiffDays >= 7) return "\u7532";
+        return "\u620A";
+      case 10:
+        if (timeDiffDays >= 10) return "\u7678";
+        return "\u58EC";
+      case 11:
+        if (timeDiffDays >= 12) return "\u5DF1";
+        if (timeDiffDays >= 9) return "\u8F9B";
+        return "\u7678";
+      default:
+        throw new Error("\u672A\u77E5\u7684\u8282\u6C14\u5E8F\u53F7\uFF1Aord=" + ord);
+    }
   };
   this.dateTimeToTimestamp = function(year, month, day, hour, minute, second) {
     var date = new Date(year, month - 1, day, hour, minute, second);
@@ -30004,7 +30084,8 @@ var Paipan = class {
       liunian: now.getFullYear(),
       allDayun,
       qyy_desc: rt.qyy_desc,
-      qyy_desc2: rt.qyy_desc2
+      qyy_desc2: rt.qyy_desc2,
+      renyuanSiling: rt.renyuanSiling
     };
   }
   getLunarDate(yy, mm, dd) {
@@ -30149,6 +30230,20 @@ var Paipan = class {
       return this.engine.calculateQiyunSimplified(birthTimestamp, solarTermTimestamp, xb, yearGan);
     } else {
       throw new Error("\u8D77\u8FD0\u8BA1\u7B97\u5931\u8D25");
+    }
+  }
+  /**
+   * 计算人元司令
+   * @param birthTimestamp 出生时间的时间戳（毫秒）
+   * @param solarTermTimestamp 节令（节气）的时间戳（毫秒）
+   * @param ord 排序参数
+   * @returns 人元司令的天干
+   */
+  calculateRenyuanSiling(birthTimestamp, solarTermTimestamp, ord) {
+    if (this.engine.calculateRenyuanSiling) {
+      return this.engine.calculateRenyuanSiling(birthTimestamp, solarTermTimestamp, ord);
+    } else {
+      throw new Error("\u4EBA\u5143\u53F8\u4EE4\u8BA1\u7B97\u5931\u8D25");
     }
   }
   /**
@@ -32183,7 +32278,7 @@ var DayunDisplay = class {
   displayDayunInfo(container, data) {
     var _a2, _b, _c, _d, _e, _f, _g;
     const dayunDiv = container.createEl("div");
-    dayunDiv.addClass("dayun-info");
+    dayunDiv.addClass("dayun-info", "ziping-flex-column");
     let displayText = "";
     if (data.selectedDayunIndex === -1) {
       const xiaoyunYear = data.year + ((_a2 = data.selectedLiunianIndex) != null ? _a2 : 0);
@@ -32193,18 +32288,28 @@ var DayunDisplay = class {
       const xiaoYun = this.paipan.getXiaoYun(hourGan, hourZhi, data.year, data.gender, age);
       const selectedLiunianYear = data.year + ((_b = data.selectedLiunianIndex) != null ? _b : 0);
       const liuNianGanZhi = this.paipan.getYearGanZhi(selectedLiunianYear);
-      displayText = `\u5C0F\u8FD0\uFF1A${xiaoYun.gan}${xiaoYun.zhi}\u3002\u6D41\u5E74\uFF1A${xiaoyunYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}\u5E74\uFF0C${age}\u5C81`;
+      displayText = `\u5C0F\u8FD0\uFF1A${xiaoYun.gan}${xiaoYun.zhi}\u8FD0\u3002\u6D41\u5E74\uFF1A${xiaoyunYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}\u5E74\uFF0C${age}\u5C81`;
     } else {
       const selectedDayunForDisplay = data.dayun.allDayun[(_c = data.selectedDayunIndex) != null ? _c : 0] || data.dayun.currentDayun;
       const selectedLiunianIndex = (_d = data.selectedLiunianIndex) != null ? _d : 0;
       const selectedLiunianYear = selectedDayunForDisplay.startYear + selectedLiunianIndex;
       const age = selectedLiunianYear - data.year + 1;
       const liuNianGanZhi = this.paipan.getYearGanZhi(selectedLiunianYear);
-      displayText = `\u5927\u8FD0\uFF1A${selectedDayunForDisplay.gz}\u3002\u6D41\u5E74\uFF1A${selectedLiunianYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}\u5E74\uFF0C${age}\u5C81`;
+      displayText = `\u5927\u8FD0\uFF1A${selectedDayunForDisplay.gz}\u8FD0\uFF0C${selectedDayunForDisplay.age}\u5C81\u3002\u6D41\u5E74\uFF1A${selectedLiunianYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}\u5E74\uFF0C${age}\u5C81`;
     }
-    const qiyunText = `\u8D77\u8FD0\uFF1A${data.dayun.qyy_desc ? data.dayun.qyy_desc : ""}\uFF0C${data.dayun.startAge}\u5C81\u3002`;
-    dayunDiv.createEl("p", { text: qiyunText });
-    dayunDiv.createEl("p", { text: `\u4EA4\u8FD0\uFF1A${data.dayun.qyy_desc2 ? data.dayun.qyy_desc2 : ""}` });
+    const qiyunText = `\u8D77\u8FD0\uFF1A${data.dayun.qyy_desc ? data.dayun.qyy_desc : ""}`;
+    const siLing = dayunDiv.createEl("div");
+    siLing.addClass("ziping-flex-gap-0-mb-6-0-6-0");
+    siLing.createEl("span", { text: qiyunText });
+    const peopleSiling = siLing.createEl("span", { text: `\u53F8\u4EE4\uFF1A` });
+    peopleSiling.addClass("si-ling", "ziping-margin-left-auto");
+    if (data.dayun.renyuanSiling) {
+      const renyuanSpan = siLing.createEl("span");
+      renyuanSpan.setText(data.dayun.renyuanSiling);
+      const wuxing = this.paipan.getGanWuXing(data.dayun.renyuanSiling);
+      renyuanSpan.addClass("c-" + wuxing);
+    }
+    dayunDiv.createEl("p", { text: `\u4EA4\u8FD0\uFF1A${data.dayun.startAge}\u5C81\uFF0C${data.dayun.qyy_desc2 ? data.dayun.qyy_desc2 : ""}` });
     dayunDiv.createEl("p", { text: displayText });
     const dayunList = dayunDiv.createEl("div");
     dayunList.addClass("dayun-list");
@@ -32460,7 +32565,7 @@ var ResultDisplay = class {
       });
     }
     const checkboxContainer = solarTermsRow.createEl("div", { cls: "ziping-flex-gap-0" });
-    checkboxContainer.addClass("ziping-margin-left-10", "ziping-flex-gap-0-mb-6-0-6-0");
+    checkboxContainer.addClass("ziping-margin-left-auto", "ziping-flex-gap-0-justify-end");
     const hourPillarCheckbox = checkboxContainer.createEl("input", { type: "checkbox" });
     hourPillarCheckbox.addClass("ziping-switch-checkbox");
     hourPillarCheckbox.checked = data.showHourPillar !== false;
@@ -32964,13 +33069,9 @@ var StyleSet = class {
 // src/utils/styleUtils.ts
 var styleModule = new StyleModule({
   // 基础的 Flex 容器，启用 flex 布局
-  ".ziping-flex": {
-    display: "flex"
-  },
-  ".ziping-flex-end": {
-    display: "flex",
-    justifyContent: "flex-end"
-  },
+  ".ziping-flex": { display: "flex" },
+  ".ziping-flex-column": { flexDirection: "column" },
+  ".ziping-flex-end": { display: "flex", justifyContent: "flex-end" },
   ".ziping-flex-align-center": {
     display: "flex",
     alignItems: "center"
@@ -32980,6 +33081,12 @@ var styleModule = new StyleModule({
     gap: "0px",
     margin: "6px 0px 6px 0px",
     alignItems: "center"
+  },
+  ".ziping-flex-gap-0-justify-end": {
+    display: "flex",
+    gap: "0px",
+    alignItems: "center",
+    justifyContent: "flex-end"
   },
   // 常见间距
   ".ziping-gap-0": { gap: "0px" },

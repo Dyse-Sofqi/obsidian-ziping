@@ -126,7 +126,7 @@ export class ResultDisplay {
 
         // 创建一个checkbox
         const checkboxContainer = solarTermsRow.createEl('div', { cls: 'ziping-flex-gap-0' });
-        checkboxContainer.addClass('ziping-margin-left-10','ziping-flex-gap-0-mb-6-0-6-0');
+        checkboxContainer.addClass('ziping-margin-left-auto','ziping-flex-gap-0-justify-end');
         const hourPillarCheckbox = checkboxContainer.createEl('input', { type: 'checkbox' });
         hourPillarCheckbox.addClass('ziping-switch-checkbox');
         hourPillarCheckbox.checked = data.showHourPillar !== false;

@@ -150,7 +150,7 @@
 
 /* 大运按钮选中状态 */
 .dayun-btn.is-selected {
-    background-color: rgba(0, 0, 0, 0.03);
+    background-color: rgba(0, 0, 0, 0.05);
     border-color: var(--interactive-accent, #7d5fff);
 }
 
@@ -470,4 +470,7 @@
 }
 .ziping-margin-right-10 {
     margin-right: 10px;
+}
+.ziping-margin-left-auto {
+    margin-left: auto;
 }

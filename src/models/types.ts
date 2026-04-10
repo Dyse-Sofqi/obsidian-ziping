@@ -28,10 +28,10 @@ export interface CurrentBaziData {
 
 // Paipan.ts 中的类型定义
 export interface BaziResult {
-    gztg: string[];
-    dz: string[];
-    nyy: number[];
-    nwx: number[];
+    gztg: string[]; // 年、月、日、时 天干
+    dz: string[]; // 年、月、日、时 地支
+    nyy: number[]; // 标记大运开始和结束年份
+    nwx: number[]; // 五行属性配置
     zty?: { hour: number; minute: number; second: number }; // 真太阳时
 }
 
@@ -66,6 +66,7 @@ export interface CurrentDayunData {
     allDayun: DayunItem[];
     qyy_desc?: string;
     qyy_desc2?: string;
+    renyuanSiling?: string;
 }
 
 // 地理位置相关类型

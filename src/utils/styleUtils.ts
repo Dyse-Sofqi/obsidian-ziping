@@ -3,13 +3,9 @@ import { StyleModule } from 'style-mod';
 // 预定义样式类名和对应的 CSS 规则
 export const styleModule = new StyleModule({
     // 基础的 Flex 容器，启用 flex 布局
-    '.ziping-flex': {
-        display: 'flex'
-    },
-    '.ziping-flex-end': {
-        display: 'flex',
-        justifyContent: 'flex-end'
-    },
+    '.ziping-flex': { display: 'flex' },
+    '.ziping-flex-column': { flexDirection: 'column' },
+    '.ziping-flex-end': { display: 'flex', justifyContent: 'flex-end' },
     '.ziping-flex-align-center': {
         display: 'flex',
         alignItems: 'center'
@@ -19,6 +15,12 @@ export const styleModule = new StyleModule({
         gap: '0px',
         margin: '6px 0px 6px 0px',
         alignItems: 'center'
+    },
+    '.ziping-flex-gap-0-justify-end': {
+        display: 'flex',
+        gap: '0px',
+        alignItems: 'center',
+        justifyContent: 'flex-end'
     },
 
     // 常见间距

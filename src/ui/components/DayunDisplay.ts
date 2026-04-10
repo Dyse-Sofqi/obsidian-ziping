@@ -28,7 +28,7 @@ export class DayunDisplay {
     displayDayunInfo(container: Element, data: CurrentBaziData) {
         // 大运信息
         const dayunDiv = container.createEl('div');
-        dayunDiv.addClass('dayun-info');
+        dayunDiv.addClass('dayun-info', 'ziping-flex-column');
 
         // 当前大运和流年 - 显示选中的大运或小运和流年
         let displayText = '';
@@ -41,20 +41,32 @@ export class DayunDisplay {
             const xiaoYun = this.paipan.getXiaoYun(hourGan, hourZhi, data.year, data.gender, age);
             const selectedLiunianYear = data.year + (data.selectedLiunianIndex ?? 0);
             const liuNianGanZhi = this.paipan.getYearGanZhi(selectedLiunianYear);
-            displayText = `小运：${xiaoYun.gan}${xiaoYun.zhi}。流年：${xiaoyunYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}年，${age}岁`;
+            displayText = `小运：${xiaoYun.gan}${xiaoYun.zhi}运。流年：${xiaoyunYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}年，${age}岁`;
         } else {
             const selectedDayunForDisplay = data.dayun.allDayun[data.selectedDayunIndex ?? 0] || data.dayun.currentDayun;
             const selectedLiunianIndex = data.selectedLiunianIndex ?? 0;
             const selectedLiunianYear = selectedDayunForDisplay.startYear + selectedLiunianIndex;
             const age = selectedLiunianYear - data.year + 1;
             const liuNianGanZhi = this.paipan.getYearGanZhi(selectedLiunianYear);
-            displayText = `大运：${selectedDayunForDisplay.gz}。流年：${selectedLiunianYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}年，${age}岁`;
+            displayText = `大运：${selectedDayunForDisplay.gz}运，${selectedDayunForDisplay.age}岁。流年：${selectedLiunianYear}${liuNianGanZhi.gan}${liuNianGanZhi.zhi}年，${age}岁`;
         }
 
         // 起运显示 - 直接使用paipan.js计算完成的数据
-        const qiyunText = `起运：${data.dayun.qyy_desc ? data.dayun.qyy_desc : ''}，${data.dayun.startAge}岁。`;
-        dayunDiv.createEl('p', { text: qiyunText });
-        dayunDiv.createEl('p', { text: `交运：${data.dayun.qyy_desc2 ? data.dayun.qyy_desc2 : ''}`});
+        const qiyunText = `起运：${data.dayun.qyy_desc ? data.dayun.qyy_desc : ''}`;
+        const siLing = dayunDiv.createEl('div');
+        siLing.addClass('ziping-flex-gap-0-mb-6-0-6-0');
+        siLing.createEl('span', { text: qiyunText });
+        
+        // 人元司令显示
+        const peopleSiling = siLing.createEl('span', { text: `司令：`});
+        peopleSiling.addClass('si-ling', 'ziping-margin-left-auto');
+        if (data.dayun.renyuanSiling) {
+            const renyuanSpan = siLing.createEl('span');
+            renyuanSpan.setText(data.dayun.renyuanSiling);
+            const wuxing = this.paipan.getGanWuXing(data.dayun.renyuanSiling);
+            renyuanSpan.addClass('c-' + wuxing);
+        }
+        dayunDiv.createEl('p', { text: `交运：${data.dayun.startAge}岁，${data.dayun.qyy_desc2 ? data.dayun.qyy_desc2 : ''}`});
         dayunDiv.createEl('p', { text: displayText });
 
         // 大运列表
