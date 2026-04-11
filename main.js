@@ -1642,17 +1642,28 @@ function paipan() {
   this.GetAdjustedJQ = function(yy, calendar) {
     var yy = this.intval(yy);
     var calendar = calendar ? 1 : 0;
+    if (yy < -2e3 || yy > 3e3) {
+      console.warn("\u5E74\u4EFD\u8D85\u51FA\u8BA1\u7B97\u8303\u56F4:", yy, "\u4F7F\u7528\u8FD1\u4F3C\u8BA1\u7B97");
+    }
     if (this.JQ[yy] == void 0) {
       this.JQ[yy] = [];
     }
     if (this.JQ[yy][0] == void 0) {
       var jdjq = [];
       var jdez = this.MeanJQJD(yy);
+      if (!jdez || jdez.length < 24) {
+        console.warn("\u5E74\u4EFD", yy, "\u7684\u8282\u6C14\u5747\u503C\u8BA1\u7B97\u5931\u8D25\uFF0C\u4F7F\u7528\u6807\u51C6\u5206\u5E03");
+        jdez = this._getFallbackJQDistribution(yy);
+      }
       for (var i = 0; i < 24; i++) {
         var ptb = this.Perturbation(jdez[i]);
         var dt = this.DeltaT(yy, Math.ceil(i / 2) + 3);
         jdjq[i] = jdez[i] + ptb - dt / 60 / 24;
         jdjq[i] = jdjq[i] + 8 / 24;
+        if (!jdjq[i] || jdjq[i] <= 0) {
+          console.warn("\u8282\u6C14", i, "\u8BA1\u7B97\u5F02\u5E38\uFF0C\u4F7F\u7528\u9ED8\u8BA4\u503C");
+          jdjq[i] = this._getDefaultJulianDay(yy, i);
+        }
       }
       this.JQ[yy][0] = jdjq;
     }
@@ -2540,11 +2551,41 @@ function paipan() {
     rt["cyy"] = this.cyy[yytg[2]];
     return rt;
   };
+  this.detectTimestampUnit = function(timestamp) {
+    var nowSeconds = Math.floor(Date.now() / 1e3);
+    var nowMilliseconds = Date.now();
+    var maxSecondsReasonable = nowSeconds + 200 * 365 * 24 * 60 * 60;
+    var minSecondsReasonable = -5e8;
+    var maxMillisecondsReasonable = nowMilliseconds + 200 * 365 * 24 * 60 * 60 * 1e3;
+    var minMillisecondsReasonable = -5e11;
+    var isLikelySeconds = timestamp >= minSecondsReasonable && timestamp <= maxSecondsReasonable;
+    var isLikelyMilliseconds = timestamp >= minMillisecondsReasonable && timestamp <= maxMillisecondsReasonable;
+    if (isLikelySeconds && !isLikelyMilliseconds) {
+      return "seconds";
+    } else if (isLikelyMilliseconds && !isLikelySeconds) {
+      return "milliseconds";
+    } else {
+      var threshold = 1e10;
+      return timestamp > threshold ? "milliseconds" : "seconds";
+    }
+  };
   this.calculateQiyunSimplified = function(birthTimestamp, solarTermTimestamp, isForward) {
+    var calculationLog = {
+      input: {
+        birthTimestamp,
+        solarTermTimestamp,
+        isForward
+      },
+      detection: {},
+      conversion: {},
+      result: {}
+    };
     if (!birthTimestamp || !solarTermTimestamp) {
+      calculationLog.error = "\u65F6\u95F4\u6233\u4E3A\u7A7A";
+      console.warn("\u8D77\u8FD0\u8BA1\u7B97\u65E5\u5FD7:", calculationLog);
       throw new Error("\u65E0\u6548\u7684\u65F6\u95F4\u6233\uFF1A\u65F6\u95F4\u6233\u4E0D\u80FD\u4E3A\u7A7A");
     }
-    var isMilliseconds = birthTimestamp > 1e11 || solarTermTimestamp > 1e11;
+    var isMilliseconds = birthTimestamp > 1e9 || solarTermTimestamp > 1e9;
     if (isMilliseconds) {
       birthTimestamp = Math.floor(birthTimestamp / 1e3);
       solarTermTimestamp = Math.floor(solarTermTimestamp / 1e3);
@@ -2586,7 +2627,14 @@ function paipan() {
     if (ord < 0 || ord > 11) {
       throw new Error("\u65E0\u6548\u7684\u8282\u6C14\u5E8F\u53F7\uFF1Aord \u53C2\u6570\u5FC5\u987B\u5728 0-11 \u8303\u56F4\u5185");
     }
-    var isMilliseconds = birthTimestamp > 1e11 || solarTermTimestamp > 1e11;
+    var birthUnit = this.detectTimestampUnit(birthTimestamp);
+    var solarUnit = this.detectTimestampUnit(solarTermTimestamp);
+    var isMilliseconds = false;
+    if (birthUnit === "milliseconds" || solarUnit === "milliseconds") {
+      isMilliseconds = true;
+    } else {
+      isMilliseconds = birthTimestamp > 1e12 || solarTermTimestamp > 1e12;
+    }
     if (isMilliseconds) {
       birthTimestamp = Math.floor(birthTimestamp / 1e3);
       solarTermTimestamp = Math.floor(solarTermTimestamp / 1e3);
@@ -2646,6 +2694,217 @@ function paipan() {
   this.dateTimeToTimestamp = function(year, month, day, hour, minute, second) {
     var date = new Date(year, month - 1, day, hour, minute, second);
     return date.getTime();
+  };
+  this.calculateLiuyue = function(baziResult, liunianYear) {
+    var liuyueList = [];
+    if (!baziResult || !baziResult.gztg || !baziResult.dz) {
+      return liuyueList;
+    }
+    var liunianGan = (liunianYear - 4) % 10;
+    var liunianZhi = (liunianYear - 4) % 12;
+    var liunianGanZhi = this.ctg[liunianGan] + this.cdz[liunianZhi];
+    var monthlyGanStarts = {
+      0: 8,
+      // 甲己之年的正月丙寅(丙为3，但需要调整起点)
+      1: 6,
+      // 乙庚
+      2: 4,
+      // 丙辛
+      3: 2,
+      // 丁壬
+      4: 0,
+      // 戊癸
+      5: 8,
+      // 己甲
+      6: 6,
+      // 庚乙
+      7: 4,
+      // 辛丙
+      8: 2,
+      // 壬丁
+      9: 0
+      // 癸戊
+    };
+    var monthZhiList = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1];
+    var ganStart = monthlyGanStarts[liunianGan];
+    for (var i = 0; i < 12; i++) {
+      var monthGanIndex = (ganStart + i) % 10;
+      var monthZhiIndex = monthZhiList[i];
+      var gan = this.ctg[monthGanIndex];
+      var zhi = this.cdz[monthZhiIndex];
+      var gz = gan + zhi;
+      var dayGan = baziResult.gztg[2];
+      var dayGanIndex = this.ctg.indexOf(dayGan.charAt(0));
+      var ganShishen = this.calculateShishen(dayGanIndex, monthGanIndex);
+      var zhiShishen = this.getZhiShiShen(dayGan, zhi);
+      var monthNames = [
+        "\u7ACB\u6625",
+        "\u60CA\u86F0",
+        "\u6E05\u660E",
+        "\u7ACB\u590F",
+        "\u8292\u79CD",
+        "\u5C0F\u6691",
+        "\u7ACB\u79CB",
+        "\u767D\u9732",
+        "\u5BD2\u9732",
+        "\u7ACB\u51AC",
+        "\u5927\u96EA",
+        "\u5C0F\u5BD2"
+      ];
+      var monthDate = this.getLiuyueActualDate(liunianYear, i);
+      liuyueList.push({
+        name: monthNames[i],
+        date: monthDate,
+        gan,
+        zhi,
+        gz,
+        ganShishen,
+        zhiShishen,
+        shishen: ganShishen
+        // 保持向后兼容性
+      });
+    }
+    return liuyueList;
+  };
+  this.getLiuyueActualDate = function(year, monthIndex) {
+    var monthToJqIndex = [21, 23, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+    if (monthIndex === void 0 || monthIndex < 0 || monthIndex >= 12) {
+      monthIndex = 0;
+    }
+    var jqList = this.GetAdjustedJQ(year, false);
+    if (!jqList || jqList.length < 24 || jqList[monthToJqIndex[monthIndex]] === void 0) {
+      console.warn("\u5E74\u4EFD", year, "\u7684\u7B2C", monthIndex + 1, "\u4E2A\u6D41\u6708\u8282\u6C14\u8BA1\u7B97\u5931\u8D25\uFF0C\u4F7F\u7528\u540E\u5907\u65E5\u671F");
+      var fallbackDates = ["2/4", "3/5", "4/5", "5/5", "6/6", "7/7", "8/7", "9/7", "10/8", "11/7", "12/7", "1/5"];
+      var safeIndex = Math.max(0, Math.min(monthIndex, fallbackDates.length - 1));
+      return fallbackDates[safeIndex];
+    }
+    var julianDay = jqList[monthToJqIndex[monthIndex]];
+    if (julianDay <= 0 || julianDay > 25e5) {
+      var fallbackDates = ["2/4", "3/5", "4/5", "5/5", "6/6", "7/7", "8/7", "9/7", "10/8", "11/7", "12/7", "1/5"];
+      var safeIndex = Math.max(0, Math.min(monthIndex, fallbackDates.length - 1));
+      return fallbackDates[safeIndex];
+    }
+    var dateArr = this.Jtime(julianDay);
+    if (!dateArr || dateArr.length < 3) {
+      console.warn("\u5112\u7565\u65E5\u8F6C\u6362\u5931\u8D25:", julianDay, "\u4F7F\u7528\u540E\u5907\u65E5\u671F");
+      var fallbackDates = ["2/4", "3/5", "4/5", "5/5", "6/6", "7/7", "8/7", "9/7", "10/8", "11/7", "12/7", "1/5"];
+      var safeIndex = Math.max(0, Math.min(monthIndex, fallbackDates.length - 1));
+      return fallbackDates[safeIndex];
+    }
+    var result = dateArr[1] + "/" + dateArr[2];
+    return result;
+  };
+  this.calculateShishen = function(dayGanIndex, targetGanIndex) {
+    if (dayGanIndex === -1 || targetGanIndex === -1) return "";
+    var dgs = [
+      [2, 3, 1, 0, 9, 8, 7, 6, 5, 4],
+      // 甲
+      [3, 2, 0, 1, 8, 9, 6, 7, 4, 5],
+      // 乙
+      [5, 4, 2, 3, 1, 0, 9, 8, 7, 6],
+      // 丙
+      [4, 5, 3, 2, 0, 1, 8, 9, 6, 7],
+      // 丁
+      [7, 6, 5, 4, 2, 3, 1, 0, 9, 8],
+      // 戊
+      [6, 7, 4, 5, 3, 2, 0, 1, 8, 9],
+      // 己
+      [9, 8, 7, 6, 5, 4, 2, 3, 1, 0],
+      // 庚
+      [8, 9, 6, 7, 4, 5, 3, 2, 0, 1],
+      // 辛
+      [1, 0, 9, 8, 7, 6, 5, 4, 2, 3],
+      // 壬
+      [0, 1, 8, 9, 6, 7, 4, 5, 3, 2]
+      // 癸
+    ];
+    var sssFull = ["\u4F24\u5B98", "\u98DF\u795E", "\u6BD4\u80A9", "\u52AB\u8D22", "\u6B63\u5370", "\u504F\u5370", "\u6B63\u5B98", "\u504F\u5B98", "\u6B63\u8D22", "\u504F\u8D22"];
+    var dayRow = dgs[dayGanIndex];
+    if (!dayRow) return "";
+    var shiShenIndex = dayRow[targetGanIndex];
+    if (shiShenIndex === void 0) return "";
+    return sssFull[shiShenIndex] || "";
+  };
+  this.getZhiShiShen = function(dayGan, zhi) {
+    var mainCangGan = this.getMainCangGan(zhi);
+    if (!mainCangGan) {
+      return "";
+    }
+    var dayGanIndex = this.ctg.indexOf(dayGan.charAt(0));
+    var cangGanIndex = this.ctg.indexOf(mainCangGan);
+    if (dayGanIndex === -1 || cangGanIndex === -1) {
+      return "";
+    }
+    return this.calculateShishen(dayGanIndex, cangGanIndex);
+  };
+  this.getMainCangGan = function(zhi) {
+    var zhiIndex = this.cdz.indexOf(zhi);
+    if (zhiIndex === -1) return "";
+    var cangGanTable = [
+      // 子(0): 癸
+      [9, -1, -1],
+      // 丑(1): 己辛癸
+      [5, 9, 7],
+      // 寅(2): 甲丙戊
+      [0, 2, 4],
+      // 卯(3): 乙
+      [1, -1, -1],
+      // 辰(4): 戊乙癸
+      [4, 1, 9],
+      // 巳(5): 丙戊庚
+      [2, 4, 6],
+      // 午(6): 己丁
+      [5, 3, -1],
+      // 未(7): 己丁乙
+      [5, 3, 1],
+      // 申(8): 庚壬戊
+      [6, 8, 4],
+      // 酉(9): 辛
+      [7, -1, -1],
+      // 戌(10): 戊辛丁
+      [4, 7, 3],
+      // 亥(11): 壬甲
+      [8, 0, -1]
+    ];
+    var mainGanIndex = cangGanTable[zhiIndex][0];
+    if (mainGanIndex === -1 || mainGanIndex >= this.ctg.length) {
+      return "";
+    }
+    return this.ctg[mainGanIndex];
+  };
+  this._getFallbackJQDistribution = function(year) {
+    var baseYear = 2e3;
+    var baseJD = 2451545;
+    var jdez = [];
+    var yearSpan = year - baseYear;
+    var daysPerYear = 365.2422;
+    for (var i = 0; i < 24; i++) {
+      jdez[i] = baseJD + yearSpan * daysPerYear + i * 15.2;
+    }
+    return jdez;
+  };
+  this._getDefaultJulianDay = function(year, jqIndex) {
+    var baseDate = new Date(year, 0, 1);
+    baseDate.setHours(12, 0, 0, 0);
+    var offsetDays = jqIndex * 15.2;
+    baseDate.setDate(baseDate.getDate() + offsetDays);
+    var time = baseDate.getTime();
+    return time / 864e5 + 24405875e-1;
+  };
+  this._validateJQCalculation = function(year, jqList) {
+    if (!jqList || jqList.length !== 24) return false;
+    for (var i = 1; i < 24; i++) {
+      if (jqList[i] <= jqList[i - 1]) {
+        console.warn("\u8282\u6C14\u5112\u7565\u65E5\u672A\u9012\u589E:", jqList[i - 1], "->", jqList[i]);
+        return false;
+      }
+    }
+    var yearSpan = jqList[23] - jqList[0];
+    if (yearSpan < 360 || yearSpan > 370) {
+      console.warn("\u5E74\u4EFD", year, "\u8282\u6C14\u8DE8\u5EA6\u5F02\u5E38:", yearSpan);
+      return false;
+    }
+    return true;
   };
 }
 var init_paipan = __esm({
@@ -29928,6 +30187,21 @@ async function domToWebp(node, options) {
 // src/Paipan.ts
 var Paipan = class {
   constructor(timeCorrectionEnabled = false) {
+    // 12干支月开始节气（节令）定义
+    this.GANZHI_MONTH_SOLAR_TERMS = [
+      "\u7ACB\u6625",
+      "\u60CA\u86F0",
+      "\u6E05\u660E",
+      "\u7ACB\u590F",
+      "\u8292\u79CD",
+      "\u5C0F\u6691",
+      "\u7ACB\u79CB",
+      "\u767D\u9732",
+      "\u5BD2\u9732",
+      "\u7ACB\u51AC",
+      "\u5927\u96EA",
+      "\u5C0F\u5BD2"
+    ];
     var _a2, _b;
     this.timeCorrectionEnabled = timeCorrectionEnabled;
     if (!window.p) {
@@ -30015,23 +30289,25 @@ var Paipan = class {
         value: jd
       });
     }
-    return solarTerms;
+    return solarTerms.sort((a, b) => a.date.getTime() - b.date.getTime());
   }
   getNearbySolarTerms(yy, mm, dd) {
-    const terms = this.getSolarTerms(yy);
     const currentDate = new Date(yy, mm - 1, dd);
+    const terms = [];
+    for (let y = yy - 1; y <= yy + 1; y++) {
+      const yearTerms = this.getSolarTerms(y);
+      terms.push(...yearTerms);
+    }
+    const sortedTerms = terms.sort((a, b) => a.date.getTime() - b.date.getTime());
     let previous = null;
     let next = null;
-    for (const term of terms) {
+    for (const term of sortedTerms) {
       if (term.date.getTime() <= currentDate.getTime()) {
         previous = term;
       } else {
         next = term;
         break;
       }
-    }
-    if (!previous && terms.length > 0) {
-      previous = terms[terms.length - 1] || null;
     }
     return {
       previous,
@@ -30839,6 +31115,178 @@ var Paipan = class {
     }
     return result;
   }
+  // 计算流月
+  calculateLiuyue(baziResult, liunianYear) {
+    var _a2, _b;
+    return ((_b = (_a2 = this.engine).calculateLiuyue) == null ? void 0 : _b.call(_a2, baziResult, liunianYear)) || [];
+  }
+  /**
+   * 获取干支月开始节气（12节令）
+   * @param year 年份
+   * @returns 12个干支月开始节气的数组
+   */
+  getGanzhiMonthSolarTerms(year) {
+    const jqCurrentYear = this.engine.GetAdjustedJQ(year, false);
+    const jqPrevYear = this.engine.GetAdjustedJQ(year - 1, false);
+    if (!Array.isArray(jqCurrentYear) || jqCurrentYear.length < 24 || !Array.isArray(jqPrevYear) || jqPrevYear.length < 24) {
+      return [];
+    }
+    const ganzhiTerms = [];
+    for (let i = 0; i < 48; i++) {
+      const yearIndex = Math.floor(i / 24);
+      const jqIndex = i % 24;
+      const jq = yearIndex === 0 ? jqPrevYear : jqCurrentYear;
+      const jd = jq[jqIndex];
+      if (typeof jd !== "number" || isNaN(jd)) {
+        continue;
+      }
+      const termDate = this.jdToDate(jd);
+      const actualYear = termDate.getFullYear();
+      if (actualYear !== year) {
+        continue;
+      }
+      const jr = this.engine.Jtime ? this.engine.Jtime(jd) : [];
+      const actualName = this.engine.jq && Array.isArray(this.engine.jq) && jqIndex < this.engine.jq.length ? this.engine.jq[jqIndex] || `\u8282\u6C14${jqIndex + 1}` : `\u8282\u6C14${jqIndex + 1}`;
+      if (this.GANZHI_MONTH_SOLAR_TERMS.includes(actualName)) {
+        ganzhiTerms.push({
+          name: actualName,
+          date: termDate,
+          jr: Array.isArray(jr) && jr.length === 6 ? jr : this.dateToJRArray(termDate),
+          jd,
+          value: jd
+        });
+      }
+    }
+    const sortedTerms = ganzhiTerms.sort((a, b) => a.date.getTime() - b.date.getTime());
+    return sortedTerms;
+  }
+  /**
+   * 获取当前时间对应的干支月节令
+   * @param year 年份
+   * @param month 月份 (1-12)
+   * @param day 日期
+   * @returns 上一个和下一个干支月节令及间隔天数
+   */
+  getGanzhiMonthNearbySolarTerms(yy, mm, dd) {
+    const ganzhiTerms = this.getGanzhiMonthSolarTerms(yy);
+    const currentDate = new Date(yy, mm - 1, dd);
+    let previous = null;
+    let next = null;
+    for (const term of ganzhiTerms) {
+      if (term.date.getTime() < currentDate.getTime()) {
+        previous = term;
+      } else {
+        next = term;
+        break;
+      }
+    }
+    if (previous && Math.abs(currentDate.getTime() - previous.date.getTime()) < 1e3 * 60 * 60) {
+      next = previous;
+      const prevYearTerms = this.getGanzhiMonthSolarTerms(yy - 1);
+      previous = prevYearTerms.length > 0 ? prevYearTerms[prevYearTerms.length - 1] || null : null;
+    }
+    if (!previous && ganzhiTerms.length > 0) {
+      const prevYearTerms = this.getGanzhiMonthSolarTerms(yy - 1);
+      if (prevYearTerms.length > 0) {
+        previous = prevYearTerms[prevYearTerms.length - 1] || null;
+      } else {
+        console.log("\u4E0A\u4E00\u5E74\u8282\u6C14\u6570\u7EC4\u4E3A\u7A7A");
+      }
+    }
+    if (!next && ganzhiTerms.length > 0) {
+      const nextYearTerms = this.getGanzhiMonthSolarTerms(yy + 1);
+      if (nextYearTerms.length > 0) {
+        next = nextYearTerms[0] || null;
+      }
+    }
+    return {
+      previous,
+      next,
+      interval: previous && next ? Math.floor((next.date.getTime() - previous.date.getTime()) / (1e3 * 60 * 60 * 24)) : null
+    };
+  }
+  /**
+   * 计算交运具体日期描述
+   * @param birthYear 出生年份
+   * @param birthMonth 出生月份
+   * @param birthDay 出生日期
+   * @param qyyDesc2 原交运描述
+   * @returns 交运具体日期描述
+   */
+  calculateJiaoyunDateDesc(birthYear, birthMonth, birthDay, qyyDesc2) {
+    if (!qyyDesc2) {
+      return {
+        jiaoyunDateDesc: "",
+        jiaoyunDetailDesc: ""
+      };
+    }
+    const regex = /^逢([^年]+)年(\d{1,2})月(\d{1,2})日(\d{1,2})时交脱大运$/;
+    const match = qyyDesc2.match(regex);
+    if (!match) {
+      return {
+        jiaoyunDateDesc: "",
+        jiaoyunDetailDesc: qyyDesc2 || ""
+      };
+    }
+    const ganZhiYear = match[1];
+    const jiaoyunMonth = parseInt(match[2] || "1");
+    const jiaoyunDay = parseInt(match[3] || "1");
+    const jiaoyunHour = parseInt(match[4] || "0");
+    let estimatedStartAge = 0;
+    if (jiaoyunMonth > birthMonth || jiaoyunMonth === birthMonth && jiaoyunDay >= birthDay) {
+      estimatedStartAge = 1;
+    } else {
+      estimatedStartAge = 2;
+    }
+    const jiaoyunYear = birthYear + estimatedStartAge;
+    const solarTerms = this.getGanzhiMonthNearbySolarTerms(
+      jiaoyunYear,
+      jiaoyunMonth,
+      jiaoyunDay
+    );
+    if (!solarTerms) {
+      return {
+        jiaoyunDateDesc: "",
+        jiaoyunDetailDesc: qyyDesc2 || ""
+      };
+    }
+    const prevSolarTerm = solarTerms.previous;
+    if (!prevSolarTerm) {
+      return {
+        jiaoyunDateDesc: "",
+        jiaoyunDetailDesc: qyyDesc2
+      };
+    }
+    try {
+      const jiaoyunDateTime = new Date(jiaoyunYear, jiaoyunMonth - 1, jiaoyunDay, jiaoyunHour);
+      const prevTermDateTime = new Date(prevSolarTerm.date);
+      const timeDiffMs = jiaoyunDateTime.getTime() - prevTermDateTime.getTime();
+      const daysDiff = Math.floor(timeDiffMs / (1e3 * 60 * 60 * 24));
+      const hoursDiff = Math.floor(timeDiffMs % (1e3 * 60 * 60 * 24) / (1e3 * 60 * 60));
+      let dateDesc = `\u9022${ganZhiYear}\u5E74`;
+      dateDesc += `${prevSolarTerm.name}\u540E`;
+      if (daysDiff > 0) {
+        dateDesc += `${daysDiff}\u65E5`;
+        if (hoursDiff > 0) {
+          dateDesc += `${hoursDiff}\u65F6`;
+        }
+      } else if (hoursDiff > 0) {
+        dateDesc += `${hoursDiff}\u65F6`;
+      } else {
+        dateDesc += "\u5373\u65F6";
+      }
+      return {
+        jiaoyunDateDesc: dateDesc,
+        jiaoyunDetailDesc: qyyDesc2
+      };
+    } catch (error) {
+      console.warn("\u8BA1\u7B97\u4EA4\u8FD0\u65E5\u671F\u63CF\u8FF0\u65F6\u51FA\u9519:", error);
+      return {
+        jiaoyunDateDesc: "",
+        jiaoyunDetailDesc: qyyDesc2
+      };
+    }
+  }
 };
 
 // src/services/BaziService.ts
@@ -30883,6 +31331,23 @@ var BaziService = class {
         selectedLiunianIndex = Math.max(0, currentYear - birthYear);
       }
     }
+    let liuyue = [];
+    let selectedLiuyueIndex = 0;
+    try {
+      const liunianYear = this.calculateLiunianYear(year, selectedDayunIndex, selectedLiunianIndex, dayunData.allDayun);
+      const rawResult = this.paipan.calculateLiuyue(baziResult, liunianYear);
+      if (Array.isArray(rawResult)) {
+        liuyue = rawResult;
+        if (liuyue.length > 0) {
+          try {
+            selectedLiuyueIndex = this.calculateCurrentLiuyueIndex(liuyue);
+          } catch (error) {
+            selectedLiuyueIndex = 0;
+          }
+        }
+      }
+    } catch (error) {
+    }
     const currentData = {
       year,
       month,
@@ -30898,9 +31363,14 @@ var BaziService = class {
       dayun: dayunData,
       selectedDayunIndex,
       selectedLiunianIndex,
+      selectedLiuyueIndex: 0,
+      // 默认选中第一个流月
+      liuyue,
+      // 流月数据
       timeCorrectionEnabled,
       tag
     };
+    currentData.selectedLiuyueIndex = selectedLiuyueIndex;
     if (existingData) {
       currentData.province = existingData.province;
       currentData.city = existingData.city;
@@ -30910,12 +31380,114 @@ var BaziService = class {
     }
     return currentData;
   }
-  // 获取附近节气信息
+  // 计算当前流月索引
+  calculateCurrentLiuyueIndex(liuyue) {
+    if (!liuyue || liuyue.length === 0) {
+      console.warn("\u6D41\u6708\u6570\u636E\u4E3A\u7A7A\uFF0C\u65E0\u6CD5\u8BA1\u7B97\u5F53\u524D\u6D41\u6708\u7D22\u5F15");
+      return 0;
+    }
+    const currentDate = /* @__PURE__ */ new Date();
+    const currentYear = currentDate.getFullYear();
+    try {
+      const solarTermsResult = this.paipan.getNearbySolarTerms(currentYear, 1, 1);
+      if (!solarTermsResult || !solarTermsResult.previous || !solarTermsResult.next) {
+        throw new Error("\u65E0\u6CD5\u83B7\u53D6\u5F53\u524D\u5E74\u5EA6\u7684\u8282\u6C14\u4FE1\u606F");
+      }
+      for (let i = 0; i < liuyue.length - 1; i++) {
+        const currentLiuyue = liuyue[i];
+        const nextLiuyue = liuyue[i + 1];
+        if (!currentLiuyue || !nextLiuyue || !currentLiuyue.name || !nextLiuyue.name) {
+          throw new Error(`\u6D41\u6708\u6570\u636E\u4E0D\u5B8C\u6574: \u5F53\u524D\u6D41\u6708=${currentLiuyue == null ? void 0 : currentLiuyue.name}, \u4E0B\u4E00\u6D41\u6708=${nextLiuyue == null ? void 0 : nextLiuyue.name}`);
+        }
+        const currentJieqiExact = this.getExactJieqiTime(currentYear, currentLiuyue.name, solarTermsResult);
+        const nextJieqiExact = this.getExactJieqiTime(currentYear, nextLiuyue.name, solarTermsResult);
+        if (!currentJieqiExact || !nextJieqiExact) {
+          throw new Error(`\u65E0\u6CD5\u786E\u5B9A\u8282\u6C14\u65F6\u95F4: ${currentLiuyue.name} \u6216 ${nextLiuyue.name}`);
+        }
+        if (currentDate >= currentJieqiExact && currentDate < nextJieqiExact) {
+          return i;
+        }
+      }
+      throw new Error(`\u5F53\u524D\u65E5\u671F ${currentDate.toISOString().split("T")[0]} \u4E0D\u5728\u4EFB\u4F55\u6D41\u6708\u533A\u95F4\u5185`);
+    } catch (error) {
+      console.error("\u8BA1\u7B97\u5F53\u524D\u6D41\u6708\u7D22\u5F15\u5931\u8D25:", error);
+      if (true) {
+        throw new Error(`\u6D41\u6708\u7D22\u5F15\u8BA1\u7B97\u9519\u8BEF: ${error instanceof Error ? error.message : error}`);
+      }
+      return 0;
+    }
+  }
+  // 获取精确的节气时间
+  getExactJieqiTime(year, jieqiName, solarTermsResult) {
+    try {
+      if (!this.paipan) {
+        console.error("\u6392\u76D8\u5BF9\u8C61\u672A\u521D\u59CB\u5316");
+        return null;
+      }
+      const ganzhiTerms = this.paipan.getGanzhiMonthSolarTerms(year);
+      const targetTerm = ganzhiTerms.find((term) => term.name === jieqiName);
+      if (!targetTerm) {
+        console.warn(`\u65E0\u6CD5\u627E\u5230 ${year} \u5E74\u7684 ${jieqiName} \u8282\u6C14`);
+        return null;
+      }
+      return targetTerm.date;
+    } catch (error) {
+      console.error(`\u83B7\u53D6\u8282\u6C14 ${jieqiName} \u7CBE\u786E\u65F6\u95F4\u5931\u8D25:`, error);
+      try {
+        const nearbyTerms = this.paipan.getGanzhiMonthNearbySolarTerms(year, 1, 1);
+        if (nearbyTerms.previous && nearbyTerms.previous.name === jieqiName) {
+          return nearbyTerms.previous.date;
+        }
+        if (nearbyTerms.next && nearbyTerms.next.name === jieqiName) {
+          return nearbyTerms.next.date;
+        }
+        console.warn(`\u5907\u7528\u65B9\u6848\u4E5F\u672A\u627E\u5230 ${jieqiName} \u8282\u6C14`);
+        return null;
+      } catch (fallbackError) {
+        console.error(`\u5907\u7528\u65B9\u6848\u4E5F\u5931\u8D25:`, fallbackError);
+        return null;
+      }
+    }
+  }
+  // 根据选中信息计算流年
+  calculateLiunianYear(birthYear, selectedDayunIndex, selectedLiunianIndex, allDayun) {
+    if (selectedDayunIndex === -1) {
+      return birthYear + selectedLiunianIndex;
+    }
+    const dayunCount = allDayun ? allDayun.length : 0;
+    if (selectedDayunIndex >= 0 && selectedDayunIndex < dayunCount) {
+      const selectedDayun = allDayun[selectedDayunIndex];
+      if (selectedDayun && selectedDayun.startYear) {
+        return selectedDayun.startYear + selectedLiunianIndex;
+      }
+    }
+    console.warn("\u65E0\u6CD5\u8BA1\u7B97\u6D41\u5E74\uFF0C\u4F7F\u7528\u51FA\u751F\u5E74\u4EFD\u4F5C\u4E3A\u56DE\u9000:", birthYear);
+    return birthYear;
+  }
+  // 获取干支月节令信息（用于八字显示）
   getNearbySolarTerms(year, month, day) {
+    try {
+      return this.paipan.getGanzhiMonthNearbySolarTerms(year, month, day);
+    } catch (error) {
+      console.error("\u83B7\u53D6\u5E72\u652F\u6708\u8282\u4EE4\u5931\u8D25:", error);
+      try {
+        return this.paipan.getNearbySolarTerms(year, month, day);
+      } catch (fallbackError) {
+        console.error("\u83B7\u53D6\u8282\u6C14\u4E5F\u5931\u8D25:", fallbackError);
+        return {
+          previous: null,
+          next: null,
+          interval: null
+        };
+      }
+    }
+  }
+  // 保留原始节气获取方法（用于内部计算）
+  getStandardNearbySolarTerms(year, month, day) {
     try {
       return this.paipan.getNearbySolarTerms(year, month, day);
     } catch (error) {
-      console.error("\u83B7\u53D6\u8282\u6C14\u5931\u8D25:", error);
+      console.error("\u83B7\u53D6\u6807\u51C6\u8282\u6C14\u5931\u8D25:", error);
       return {
         previous: null,
         next: null,
@@ -30926,7 +31498,20 @@ var BaziService = class {
   // 计算大运流年
   calculateDayun(gender, year, month, day, hour) {
     try {
-      return this.paipan.getCurrentDayun(year, month, day, gender, hour);
+      const dayunData = this.paipan.getCurrentDayun(year, month, day, gender, hour);
+      if (dayunData.qyy_desc2) {
+        const { jiaoyunDateDesc, jiaoyunDetailDesc } = this.paipan.calculateJiaoyunDateDesc(
+          year,
+          month,
+          day,
+          dayunData.qyy_desc2
+        );
+        return Object.assign({}, dayunData, {
+          jiaoyunDateDesc,
+          jiaoyunDetailDesc
+        });
+      }
+      return dayunData;
     } catch (error) {
       console.error("\u8BA1\u7B97\u5927\u8FD0\u6D41\u5E74\u5931\u8D25:", error);
       return {
@@ -31392,7 +31977,7 @@ var TimeSettingModal = class extends import_obsidian4.Modal {
     tagLabel.addClass("ziping-margin-left-10");
     const tagSelect = nameGenderRow.createEl("select");
     tagSelect.addClass("margin-left-10", "margin-right-10", "ziping-border-1-ccc", "ziping-boxShadow-none");
-    const tagOptions = ["\u5173\u6CE8", "\u4EB2\u53CB", "\u540D\u4EBA", "\u53E4\u7C4D", "\u5BA2\u6237", "\u5176\u4ED6"];
+    const tagOptions = ["\u5E38\u9A7B", "\u4EB2\u53CB", "\u540D\u4EBA", "\u53E4\u4F8B", "\u5BA2\u6237", "\u5176\u4ED6"];
     const defaultOption = tagSelect.createEl("option");
     defaultOption.textContent = "\u9ED8\u8BA4";
     defaultOption.value = "";
@@ -32067,7 +32652,7 @@ var BaziTable = class {
   }
   // 创建八字表格
   createBaziTable(container, data) {
-    var _a2, _b;
+    var _a2, _b, _c;
     if (!data.bazi.gztg || !data.bazi.dz || data.bazi.gztg.length < 4 || data.bazi.dz.length < 4) {
       return;
     }
@@ -32099,6 +32684,16 @@ var BaziTable = class {
     const liuNianGanZhi = this.paipan.getYearGanZhi(liunianYear);
     const liuNianGan = liuNianGanZhi.gan;
     const liuNianZhi = liuNianGanZhi.zhi;
+    let liuyueGan = "";
+    let liuyueZhi = "";
+    if (data.liuyue && data.liuyue.length > 0) {
+      const selectedLiuyueIndex = (_c = data.selectedLiuyueIndex) != null ? _c : 0;
+      const liuyueItem = data.liuyue[selectedLiuyueIndex];
+      if (liuyueItem) {
+        liuyueGan = liuyueItem.gan;
+        liuyueZhi = liuyueItem.zhi;
+      }
+    }
     const pillars = [
       { name: "\u5E74\u67F1", gan: data.bazi.gztg[0] || "", zhi: data.bazi.dz[0] || "" },
       { name: "\u6708\u67F1", gan: data.bazi.gztg[1] || "", zhi: data.bazi.dz[1] || "" },
@@ -32113,6 +32708,9 @@ var BaziTable = class {
       headers.push("\u65F6\u67F1");
     }
     headers.push(dayunHeaderTitle, "\u6D41\u5E74");
+    if (data.showLiuyue) {
+      headers.push("\u6D41\u6708");
+    }
     headers.forEach((title) => {
       const th = headerRow.createEl("th");
       th.setText(title);
@@ -32128,6 +32726,9 @@ var BaziTable = class {
     }
     columns.push({ gan: dayunGan, zhi: dayunZhi, gz: dayunGan + dayunZhi });
     columns.push({ gan: liuNianGan, zhi: liuNianZhi, gz: liuNianGan + liuNianZhi });
+    if (data.showLiuyue && liuyueGan && liuyueZhi) {
+      columns.push({ gan: liuyueGan, zhi: liuyueZhi, gz: liuyueGan + liuyueZhi });
+    }
     const genderText = data.gender === 0 ? "\u5143\u7537" : "\u5143\u5973";
     const shishenRow = table.createEl("tr");
     const shishenValues = ["\u5341\u795E"];
@@ -32144,11 +32745,15 @@ var BaziTable = class {
       this.paipan.getShiShenFull(riZhuGan, dayunGan),
       this.paipan.getShiShenFull(riZhuGan, liuNianGan)
     );
+    if (data.showLiuyue) {
+      shishenValues.push(this.paipan.getShiShenFull(riZhuGan, liuyueGan));
+    }
     shishenValues.forEach((text, index) => {
       const td = shishenRow.createEl("td");
       td.setText(text);
       td.addClass("ziping-table-cell");
-      if (index === shishenValues.length - 2) {
+      const dayunColumnIndex = data.showLiuyue ? shishenValues.length - 3 : shishenValues.length - 2;
+      if (index === dayunColumnIndex) {
         td.addClass("ziping-border-left");
       }
     });
@@ -32179,7 +32784,8 @@ var BaziTable = class {
       rowData.values.forEach((val, idx) => {
         const td = row.createEl("td");
         td.addClass("ziping-table-cell");
-        if (idx === rowData.values.length - 2) {
+        const dayunColumnIndex = data.showLiuyue ? rowData.values.length - 3 : rowData.values.length - 2;
+        if (idx === dayunColumnIndex) {
           td.addClass("ziping-border-left");
         }
         if (rowData.isCangQi) {
@@ -32269,10 +32875,11 @@ var DayunDisplay = class {
     this.paipan = paipan2;
   }
   // 设置回调函数
-  setCallbacks(onDayunSelect, onLiunianSelect, onXiaoyunSelect) {
+  setCallbacks(onDayunSelect, onLiunianSelect, onXiaoyunSelect, onLiuyueCheckboxChange) {
     this.onDayunSelect = onDayunSelect;
     this.onLiunianSelect = onLiunianSelect;
     this.onXiaoyunSelect = onXiaoyunSelect;
+    this.onLiuyueCheckboxChange = onLiuyueCheckboxChange;
   }
   // 显示大运信息
   displayDayunInfo(container, data) {
@@ -32309,7 +32916,28 @@ var DayunDisplay = class {
       const wuxing = this.paipan.getGanWuXing(data.dayun.renyuanSiling);
       renyuanSpan.addClass("c-" + wuxing);
     }
-    dayunDiv.createEl("p", { text: `\u4EA4\u8FD0\uFF1A${data.dayun.startAge}\u5C81\uFF0C${data.dayun.qyy_desc2 ? data.dayun.qyy_desc2 : ""}` });
+    const jiaoyunContainer = dayunDiv.createEl("div");
+    jiaoyunContainer.addClass("ziping-flex-gap-0-mb-6-0-6-0");
+    let jiaoyunText = `\u4EA4\u8FD0\uFF1A${data.dayun.startAge}\u5C81`;
+    if (data.dayun.jiaoyunDateDesc) {
+      jiaoyunText += `\uFF0C${data.dayun.jiaoyunDateDesc}\u4EA4\u8FD0`;
+    } else if (data.dayun.qyy_desc2) {
+      jiaoyunText += `\uFF0C${data.dayun.qyy_desc2}\u4EA4\u8FD0`;
+    }
+    jiaoyunContainer.createEl("span", { text: jiaoyunText });
+    const liuyueCheckboxContainer = jiaoyunContainer.createEl("div", { cls: "ziping-flex-gap-0" });
+    liuyueCheckboxContainer.addClass("ziping-margin-left-auto", "ziping-flex-gap-0-justify-end");
+    const liuyueCheckbox = liuyueCheckboxContainer.createEl("input", { type: "checkbox" });
+    liuyueCheckbox.addClass("ziping-switch-checkbox");
+    liuyueCheckbox.checked = data.showLiuyue === true;
+    const liuyueLabel = liuyueCheckboxContainer.createEl("span", { text: "\u6D41\u6708" });
+    liuyueLabel.addClass("ziping-flex-nowrap");
+    liuyueCheckbox.addEventListener("change", () => {
+      data.showLiuyue = liuyueCheckbox.checked;
+      if (this.onLiuyueCheckboxChange) {
+        this.onLiuyueCheckboxChange(data.showLiuyue);
+      }
+    });
     dayunDiv.createEl("p", { text: displayText });
     const dayunList = dayunDiv.createEl("div");
     dayunList.addClass("dayun-list");
@@ -32473,6 +33101,118 @@ var DayunDisplay = class {
   }
 };
 
+// src/ui/components/LiuyueDisplay.ts
+var LiuyueDisplay = class {
+  // 设置回调函数
+  setCallbacks(onLiuyueSelect) {
+    this.onLiuyueSelect = onLiuyueSelect;
+  }
+  // 从完整十神名称获取简写
+  getShiShenShortFromFull(shiShenFull) {
+    const shiShenMap = {
+      "\u6BD4\u80A9": "\u6BD4",
+      "\u52AB\u8D22": "\u52AB",
+      "\u98DF\u795E": "\u98DF",
+      "\u4F24\u5B98": "\u4F24",
+      "\u504F\u8D22": "\u624D",
+      "\u6B63\u8D22": "\u8D22",
+      "\u4E03\u6740": "\u6740",
+      "\u504F\u5B98": "\u6740",
+      "\u6B63\u5B98": "\u5B98",
+      "\u504F\u5370": "\u67AD",
+      "\u6B63\u5370": "\u5370"
+    };
+    return shiShenMap[shiShenFull] || "";
+  }
+  // 显示流月信息
+  displayLiuyueInfo(container, data) {
+    const { liuyue, selectedLiuyueIndex } = data;
+    if (!liuyue || liuyue.length === 0) {
+      const emptyMsg = container.createEl("div");
+      emptyMsg.textContent = "\u6682\u65E0\u6D41\u6708\u6570\u636E";
+      emptyMsg.style.textAlign = "center";
+      emptyMsg.style.color = "#666";
+      return;
+    }
+    const liuyueContainer = container.createEl("div");
+    liuyueContainer.addClass("liuyue-list");
+    liuyue.forEach((item, index) => {
+      const liuyueBtn = liuyueContainer.createEl("button");
+      liuyueBtn.addClass("liuyue-btn");
+      if (index === (selectedLiuyueIndex || 0)) {
+        liuyueBtn.classList.add("is-selected");
+      }
+      const nameLine = liuyueBtn.createEl("div");
+      nameLine.textContent = item.name;
+      nameLine.addClass("liuyue-name");
+      const dateLine = liuyueBtn.createEl("div");
+      dateLine.textContent = item.date;
+      dateLine.addClass("liuyue-date");
+      const gan = item.gan || item.gz.charAt(0);
+      const ganWuXing = this.getGanWuXing(gan);
+      const ganShiShen = item.ganShishen || item.shishen || "";
+      const ganShiShenShort = this.getShiShenShortFromFull(ganShiShen);
+      const ganLine = liuyueBtn.createEl("div");
+      const ganSpan = ganLine.createEl("span");
+      ganSpan.textContent = gan;
+      ganSpan.addClass("c-" + ganWuXing);
+      const ganShiShenSpan = ganLine.createEl("span");
+      ganShiShenSpan.textContent = ganShiShenShort;
+      ganLine.addClass("liuyue-gan");
+      const zhi = item.zhi || (item.gz.charAt(1) || "");
+      const zhiWuXing = this.getZhiWuXing(zhi);
+      const zhiShiShen = item.zhiShishen || "";
+      const zhiShiShenShort = this.getShiShenShortFromFull(zhiShiShen);
+      const zhiLine = liuyueBtn.createEl("div");
+      const zhiSpan = zhiLine.createEl("span");
+      zhiSpan.textContent = zhi;
+      zhiSpan.addClass("c-" + zhiWuXing);
+      const zhiShiShenSpan = zhiLine.createEl("span");
+      zhiShiShenSpan.textContent = zhiShiShenShort;
+      zhiLine.addClass("liuyue-zhi");
+      liuyueBtn.addEventListener("click", () => {
+        if (this.onLiuyueSelect) {
+          this.onLiuyueSelect(index);
+        }
+      });
+    });
+  }
+  // 获取天干的五行属性
+  getGanWuXing(gan) {
+    const ganWuXingMap = {
+      "\u7532": "\u6728",
+      "\u4E59": "\u6728",
+      "\u4E19": "\u706B",
+      "\u4E01": "\u706B",
+      "\u620A": "\u571F",
+      "\u5DF1": "\u571F",
+      "\u5E9A": "\u91D1",
+      "\u8F9B": "\u91D1",
+      "\u58EC": "\u6C34",
+      "\u7678": "\u6C34"
+    };
+    return ganWuXingMap[gan] || "\u571F";
+  }
+  // 获取地支的五行属性
+  getZhiWuXing(zhi) {
+    const zhiWuXingMap = {
+      "\u5B50": "\u6C34",
+      "\u4E11": "\u571F",
+      "\u5BC5": "\u6728",
+      "\u536F": "\u6728",
+      "\u8FB0": "\u571F",
+      "\u5DF3": "\u706B",
+      "\u5348": "\u706B",
+      "\u672A": "\u571F",
+      "\u7533": "\u91D1",
+      "\u9149": "\u91D1",
+      "\u620C": "\u571F",
+      "\u4EA5": "\u6C34"
+    };
+    return zhiWuXingMap[zhi] || "\u571F";
+  }
+};
+
 // src/ui/components/ResultDisplay.ts
 var ResultDisplay = class {
   constructor(paipan2) {
@@ -32561,7 +33301,7 @@ var ResultDisplay = class {
         return `${date2.getMonth() + 1}/${date2.getDate()} ${hours}:${minutes}`;
       };
       solarTermsRow.createEl("span", {
-        text: `\u8282\u6C14\uFF1A${data.solarTerms.previous.name}${formatDateTime(data.solarTerms.previous.date)}-${data.solarTerms.next.name}${formatDateTime(data.solarTerms.next.date)}`
+        text: `\u6708\u8282\u4EE4\uFF1A${data.solarTerms.previous.name}${formatDateTime(data.solarTerms.previous.date)}-${data.solarTerms.next.name}${formatDateTime(data.solarTerms.next.date)}`
       });
     }
     const checkboxContainer = solarTermsRow.createEl("div", { cls: "ziping-flex-gap-0" });
@@ -32614,6 +33354,8 @@ var BaziView2 = class extends import_obsidian5.ItemView {
     super(leaf);
     this.currentData = null;
     this.resultContainer = null;
+    // 防抖控制变量
+    this.refreshTimeout = null;
     this.plugin = plugin;
     this.paipan = new Paipan(false);
     this.paipan.J = 0;
@@ -32627,6 +33369,7 @@ var BaziView2 = class extends import_obsidian5.ItemView {
     this.dataService = new DataService(this.app, this.paipan, this.plugin);
     this.baziTable = new BaziTable(this.paipan);
     this.dayunDisplay = new DayunDisplay(this.paipan);
+    this.liuyueDisplay = new LiuyueDisplay();
     this.resultDisplay = new ResultDisplay(this.paipan);
   }
   getViewType() {
@@ -32663,6 +33406,17 @@ var BaziView2 = class extends import_obsidian5.ItemView {
       },
       () => {
         this.selectXiaoyun();
+      },
+      (showLiuyue) => {
+        if (this.currentData) {
+          this.currentData.showLiuyue = showLiuyue;
+          this.refreshDisplay();
+        }
+      }
+    );
+    this.liuyueDisplay.setCallbacks(
+      (index) => {
+        this.selectLiuyue(index);
       }
     );
   }
@@ -32716,7 +33470,6 @@ var BaziView2 = class extends import_obsidian5.ItemView {
   }
   // 加载当前时间的数据
   loadCurrentTime() {
-    var _a2, _b, _c, _d;
     const now = /* @__PURE__ */ new Date();
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
@@ -32725,9 +33478,9 @@ var BaziView2 = class extends import_obsidian5.ItemView {
     const minute = now.getMinutes();
     const second = now.getSeconds();
     const gender = 0;
-    const name = (_b = (_a2 = this.currentData) == null ? void 0 : _a2.name) != null ? _b : "";
+    const name = "";
     const timeCorrectionEnabled = false;
-    const tag = (_d = (_c = this.currentData) == null ? void 0 : _c.tag) != null ? _d : "";
+    const tag = "";
     void this.updateBaziDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled, tag);
   }
   // 更新八字显示
@@ -32759,13 +33512,18 @@ var BaziView2 = class extends import_obsidian5.ItemView {
     if (preserveSelection && this.currentData) {
       baziData.selectedDayunIndex = this.currentData.selectedDayunIndex;
       baziData.selectedLiunianIndex = this.currentData.selectedLiunianIndex;
+      baziData.selectedLiuyueIndex = this.currentData.selectedLiuyueIndex;
       baziData.showHourPillar = this.currentData.showHourPillar;
+      baziData.showLiuyue = this.currentData.showLiuyue;
     }
     this.currentData = baziData;
     if (resultContainer) {
       this.resultDisplay.displayResults(resultContainer, baziData);
       this.baziTable.createBaziTable(resultContainer, baziData);
       this.dayunDisplay.displayDayunInfo(resultContainer, baziData);
+      if (baziData.showLiuyue) {
+        this.liuyueDisplay.displayLiuyueInfo(resultContainer, baziData);
+      }
     }
   }
   // 显示时间设置模态框
@@ -32816,6 +33574,7 @@ var BaziView2 = class extends import_obsidian5.ItemView {
   }
   // 保存当前案例
   async saveCurrentCase() {
+    if (!this.currentData) return;
     await this.dataService.saveCase(this.currentData);
   }
   // 选择大运
@@ -32839,23 +33598,36 @@ var BaziView2 = class extends import_obsidian5.ItemView {
     this.currentData.selectedLiunianIndex = 0;
     this.refreshDisplay();
   }
+  // 选择流月
+  selectLiuyue(index) {
+    if (!this.currentData) return;
+    this.currentData.selectedLiuyueIndex = index;
+    this.refreshDisplay();
+  }
   // 刷新显示
   refreshDisplay() {
     if (!this.currentData) return;
-    void this.updateBaziDisplay(
-      this.currentData.year,
-      this.currentData.month,
-      this.currentData.day,
-      this.currentData.hour,
-      this.currentData.minute,
-      this.currentData.second,
-      this.currentData.gender,
-      this.currentData.name || "",
-      this.currentData.timeCorrectionEnabled || false,
-      this.currentData.tag || "",
-      true
-      // preserveSelection
-    );
+    if (this.refreshTimeout) {
+      clearTimeout(this.refreshTimeout);
+    }
+    this.refreshTimeout = setTimeout(() => {
+      if (this.currentData) {
+        void this.updateBaziDisplay(
+          this.currentData.year,
+          this.currentData.month,
+          this.currentData.day,
+          this.currentData.hour,
+          this.currentData.minute,
+          this.currentData.second,
+          this.currentData.gender,
+          this.currentData.name || "",
+          this.currentData.timeCorrectionEnabled || false,
+          this.currentData.tag || "",
+          true
+          // preserveSelection
+        );
+      }
+    }, 16);
   }
   // 适配器方法，用于TimeSettingModal的回调
   async calculateAndDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled, tag) {
@@ -33315,7 +34087,7 @@ var ZipingPlugin3 = class extends import_obsidian6.Plugin {
     const dayunItems = data.dayun.allDayun.slice(0, 9);
     lines.push("");
     for (const dayun of dayunItems) {
-      lines.push(`- ${dayun.startYear}\u5E74${dayun.gan}${dayun.zhi}-${dayun.age}\u5C81`);
+      lines.push(`- ${dayun.startYear}${dayun.gan}${dayun.zhi}\u5E74${dayun.age}\u5C81`);
     }
     lines.push("");
     return lines.join("\n");

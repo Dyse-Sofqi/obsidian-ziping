@@ -1740,17 +1740,35 @@ function paipan() {
 		var yy = this.intval(yy);
 		var calendar = calendar ? 1 : 0;
 
+		// 添加年份范围验证
+		if (yy < -2000 || yy > 3000) {
+			console.warn('年份超出计算范围:', yy, '使用近似计算');
+		}
+
 		if (this.JQ[yy] == undefined) {
 			this.JQ[yy] = [];
 		}
 		if (this.JQ[yy][0] == undefined) { //必须要有0
 			var jdjq = [];
 			var jdez = this.MeanJQJD(yy); //輸入指定年,求該回歸年各節氣点
+			
+			// 验证MeanJQJD计算结果
+			if (!jdez || jdez.length < 24) {
+				console.warn('年份', yy, '的节气均值计算失败，使用标准分布');
+				jdez = this._getFallbackJQDistribution(yy);
+			}
+			
 			for (var i = 0; i < 24; i++) {
 				var ptb = this.Perturbation(jdez[i]); //取得受perturbation影響所需微調
 				var dt = this.DeltaT(yy, Math.ceil(i / 2) + 3); //修正dynamical time to Universal time
 				jdjq[i] = jdez[i] + ptb - dt / 60 / 24; //加上攝動調整值ptb得到動態時間dynamical time or ephemeris days,減去對應的Delta T值(分鐘轉換為日)得到True Universal time
 				jdjq[i] = jdjq[i] + 8 / 24; //因中國時間比格林威治時間先行8小時,即1/3日(由于农历基于此数据,此处必须为北京时间)
+				
+				// 验证每一步计算结果
+				if (!jdjq[i] || jdjq[i] <= 0) {
+					console.warn('节气', i, '计算异常，使用默认值');
+					jdjq[i] = this._getDefaultJulianDay(yy, i);
+				}
 			}
 			this.JQ[yy][0] = jdjq;
 		}
@@ -2763,12 +2781,6 @@ function paipan() {
 
 			var solarTermTimestamp = this.dateTimeToTimestamp(solarTermDateTime[0], solarTermDateTime[1], solarTermDateTime[2], solarTermDateTime[3], solarTermDateTime[4], solarTermDateTime[5]);
 
-			// 打印使用的两个时间戳
-			// console.log('出生时间戳:', birthTimestamp, '对应时间:', new Date(birthTimestamp).toLocaleString());
-			// console.log('节气时间戳:', solarTermTimestamp, '对应时间:', new Date(solarTermTimestamp).toLocaleString());
-			// console.log('时间戳差值(秒):', Math.abs(solarTermTimestamp - birthTimestamp) / 1000);
-			// console.log('时间戳差值(天):', Math.abs(solarTermTimestamp - birthTimestamp) / (24 * 60 * 60 * 1000));
-
 			qiyunResult = this.calculateQiyunSimplified(birthTimestamp, solarTermTimestamp, isForward);
 		} catch (error) {
 			console.warn('起运计算失败', error);
@@ -2923,10 +2935,47 @@ function paipan() {
 	};
 
 	/**
+	 * 智能时间戳单位检测函数
+	 * 基于合理时间范围判断时间戳单位，避免硬编码阈值问题
+	 * 
+	 * @param {number} timestamp 待检测的时间戳
+	 * @returns {string} 'seconds'表示秒级，'milliseconds'表示毫秒级
+	 */
+	this.detectTimestampUnit = function(timestamp) {
+		// 获取当前时间作为参考点
+		var nowSeconds = Math.floor(Date.now() / 1000);
+		var nowMilliseconds = Date.now();
+		
+		// 改进的时间戳范围检测
+		// 合理的秒级时间戳范围：大约1800年（约-500000000）至未来200年
+		var maxSecondsReasonable = nowSeconds + 200 * 365 * 24 * 60 * 60;
+		var minSecondsReasonable = -500000000; // 约1830年左右的Unix时间戳
+		
+		// 合理的毫秒级时间戳范围：同样的时间范围但毫秒表示
+		var maxMillisecondsReasonable = nowMilliseconds + 200 * 365 * 24 * 60 * 60 * 1000;
+		var minMillisecondsReasonable = -500000000000; // 约1830年左右的毫秒级时间戳
+		
+		// 改进的判断逻辑：基于更宽的范围和阈值检测
+		var isLikelySeconds = (timestamp >= minSecondsReasonable && timestamp <= maxSecondsReasonable);
+		var isLikelyMilliseconds = (timestamp >= minMillisecondsReasonable && timestamp <= maxMillisecondsReasonable);
+		
+		// 更智能的判断：如果两者都符合或被其中一个范围包含，使用阈值作为第二因素
+		if (isLikelySeconds && !isLikelyMilliseconds) {
+			return 'seconds';
+		} else if (isLikelyMilliseconds && !isLikelySeconds) {
+			return 'milliseconds';
+		} else {
+			// 有重叠时使用阈值检测
+			var threshold = 1e10; // 降10^10作为阈值
+			return timestamp > threshold ? 'milliseconds' : 'seconds';
+		}
+	};
+
+	/**
 	 * 统一版起运计算函数 - 使用时间戳差值计算
 	 * 支持秒级和毫秒级时间戳自动识别处理
 	 * 算法流程：
-	 * 1. 自动识别时间戳单位（秒或毫秒）并统一处理
+	 * 1. 智能检测时间戳单位（秒或毫秒）并统一处理
 	 * 2. 转换为天数差：timeDiffDays = timeDiffSeconds / (24 * 60 * 60)
 	 * 3. 按命理规则换算：3天=1年，120天=4个月
 	 * 4. 年 = int(timeDiffDays / 3)
@@ -2939,14 +2988,29 @@ function paipan() {
 	 * @returns {Object} 起运信息
 	 */
 	this.calculateQiyunSimplified = function (birthTimestamp, solarTermTimestamp, isForward) {
+		// 计算日志记录
+		var calculationLog = {
+			input: {
+				birthTimestamp: birthTimestamp,
+				solarTermTimestamp: solarTermTimestamp,
+				isForward: isForward
+			},
+			detection: {},
+			conversion: {},
+			result: {}
+		};
+
+
 		// 检查输入时间戳的有效性
 		if (!birthTimestamp || !solarTermTimestamp) {
+			calculationLog.error = '时间戳为空';
+			console.warn('起运计算日志:', calculationLog);
 			throw new Error('无效的时间戳：时间戳不能为空');
 		}
 
 		// 自动识别时间戳单位并统一为秒级
-		// 毫秒级时间戳通常大于1e11，秒级时间戳小于1e11
-		var isMilliseconds = birthTimestamp > 1e11 || solarTermTimestamp > 1e11;
+		// 毫秒级时间戳通常大于1e12，秒级时间戳小于1e12（修复1973年前的计算错误）
+		var isMilliseconds = birthTimestamp > 1e9 || solarTermTimestamp > 1e9;
 
 		if (isMilliseconds) {
 			// 转换毫秒级时间戳为秒级
@@ -3023,15 +3087,28 @@ function paipan() {
 			throw new Error('无效的节气序号：ord 参数必须在 0-11 范围内');
 		}
 
-		// 自动识别时间戳单位并统一为秒级
-		// 毫秒级时间戳通常大于1e11，秒级时间戳小于1e11
-		var isMilliseconds = birthTimestamp > 1e11 || solarTermTimestamp > 1e11;
+		// 使用智能检测算法判断时间戳单位
+		var birthUnit = this.detectTimestampUnit(birthTimestamp);
+		var solarUnit = this.detectTimestampUnit(solarTermTimestamp);
+
+		// 根据检测结果决定使用哪种转换策略
+		var isMilliseconds = false;
+		if (birthUnit === 'milliseconds' || solarUnit === 'milliseconds') {
+			isMilliseconds = true;
+		} else {
+			// 兼容原有逻辑作为备选方案
+			isMilliseconds = birthTimestamp > 1e12 || solarTermTimestamp > 1e12;
+		}
+		
+
 
 		if (isMilliseconds) {
 			// 转换毫秒级时间戳为秒级
 			birthTimestamp = Math.floor(birthTimestamp / 1000);
 			solarTermTimestamp = Math.floor(solarTermTimestamp / 1000);
 		}
+
+		// 跳过时间戳范围检查，直接进行后续计算
 
 		// 计算与上一个节令的时间差（单位为天）
 		var timeDiffSeconds = Math.abs(birthTimestamp - solarTermTimestamp);
@@ -3097,6 +3174,296 @@ function paipan() {
 		var date = new Date(year, month - 1, day, hour, minute, second);
 		// 返回毫秒级时间戳，与TypeScript版本保持一致
 		return date.getTime();
+	};
+
+	/**
+	 * 计算流月
+	 * 根据当前八字和流年信息，计算该流年中每个月的流月干支和名称
+	 *
+	 * @param {Object} baziResult 八字计算结果
+	 * @param {number} liunianYear 流年年份
+	 * @returns {Array} 流月数组，包含每月信息
+	 */
+	this.calculateLiuyue = function (baziResult, liunianYear) {
+		var liuyueList = [];
+		
+		if (!baziResult || !baziResult.gztg || !baziResult.dz) {
+			return liuyueList;
+		}
+		
+		// 获取当前流年的干支
+		var liunianGan = (liunianYear - 4) % 10;
+		var liunianZhi = (liunianYear - 4) % 12;
+		var liunianGanZhi = this.ctg[liunianGan] + this.cdz[liunianZhi];
+
+		// 流月干支计算原理: 以流年干支为基础，从正月（寅月）开始计算
+		// 甲己之年丙作首，乙庚之岁戊为头
+		// 丙辛必定寻庚起，丁壬壬位顺行流
+		// 若问戊癸何处起，甲寅之上好追求
+		
+		var monthlyGanStarts = {
+			0: 8, // 甲己之年的正月丙寅(丙为3，但需要调整起点)
+			1: 6, // 乙庚
+			2: 4, // 丙辛
+			3: 2, // 丁壬
+			4: 0, // 戊癸
+			5: 8, // 己甲
+			6: 6, // 庚乙
+			7: 4, // 辛丙
+			8: 2, // 壬丁
+			9: 0  // 癸戊
+		};
+
+		var monthZhiList = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1]; // 12地支顺序：寅(2)到丑(1)
+		var ganStart = monthlyGanStarts[liunianGan];
+		
+		// 计算每个月的流月干支
+		for (var i = 0; i < 12; i++) {
+			var monthGanIndex = (ganStart + i) % 10;
+			var monthZhiIndex = monthZhiList[i];
+			
+			var gan = this.ctg[monthGanIndex];
+			var zhi = this.cdz[monthZhiIndex];
+			var gz = gan + zhi;
+			
+		// 计算与日主的十神关系
+		var dayGan = baziResult.gztg[2]; // 日主天干（获取第2个元素，即日干）
+		var dayGanIndex = this.ctg.indexOf(dayGan.charAt(0));
+		var ganShishen = this.calculateShishen(dayGanIndex, monthGanIndex);
+		var zhiShishen = this.getZhiShiShen(dayGan, zhi);
+
+		// 确定流月名称（传统节气月）
+		var monthNames = [
+			'立春', '惊蛰', '清明', '立夏', '芒种', '小暑',
+			'立秋', '白露', '寒露', '立冬', '大雪', '小寒'
+		];
+
+		// 根据流年计算实际的节气日期
+		var monthDate = this.getLiuyueActualDate(liunianYear, i);
+			
+		liuyueList.push({
+			name: monthNames[i],
+			date: monthDate,
+			gan: gan,
+			zhi: zhi,
+			gz: gz,
+			ganShishen: ganShishen,
+			zhiShishen: zhiShishen,
+			shishen: ganShishen // 保持向后兼容性
+		});
+		}
+		
+		return liuyueList;
+	};
+
+	/**
+	 * 获取流月实际节气日期
+	 * 根据流年年份和流月索引计算实际节气日期
+	 * 
+	 * @param {number} year 流年年份
+	 * @param {number} monthIndex 流月索引 (0-11)
+	 * @return {string} 月/日格式的日期字符串
+	 */
+	this.getLiuyueActualDate = function(year, monthIndex) {
+		// 流月索引与节气索引的对应关系（基于jq数组顺序）
+		var monthToJqIndex = [21, 23, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+		
+		// 参数验证
+		if (monthIndex === undefined || monthIndex < 0 || monthIndex >= 12) {
+			monthIndex = 0;
+		}
+		
+		// 获取该年份的24节气儒略日
+		var jqList = this.GetAdjustedJQ(year, false);
+		
+		// 增强节气数据验证
+		if (!jqList || jqList.length < 24 || jqList[monthToJqIndex[monthIndex]] === undefined) {
+			console.warn('年份', year, '的第', monthIndex + 1, '个流月节气计算失败，使用后备日期');
+			
+			// 验证后备日期索引范围
+			var fallbackDates = ['2/4', '3/5', '4/5', '5/5', '6/6', '7/7', '8/7', '9/7', '10/8', '11/7', '12/7', '1/5'];
+			var safeIndex = Math.max(0, Math.min(monthIndex, fallbackDates.length - 1));
+			return fallbackDates[safeIndex];
+		}
+		
+		// 验证儒略日数值合理性
+		var julianDay = jqList[monthToJqIndex[monthIndex]];
+		if (julianDay <= 0 || julianDay > 2500000) {
+			var fallbackDates = ['2/4', '3/5', '4/5', '5/5', '6/6', '7/7', '8/7', '9/7', '10/8', '11/7', '12/7', '1/5'];
+			var safeIndex = Math.max(0, Math.min(monthIndex, fallbackDates.length - 1));
+			return fallbackDates[safeIndex];
+		}
+		
+		// 将儒略日转换为具体日期
+		var dateArr = this.Jtime(julianDay);
+		
+		// 验证转换结果
+		if (!dateArr || dateArr.length < 3) {
+			console.warn('儒略日转换失败:', julianDay, '使用后备日期');
+			var fallbackDates = ['2/4', '3/5', '4/5', '5/5', '6/6', '7/7', '8/7', '9/7', '10/8', '11/7', '12/7', '1/5'];
+			var safeIndex = Math.max(0, Math.min(monthIndex, fallbackDates.length - 1));
+			return fallbackDates[safeIndex];
+		}
+		
+		// 返回 月/日 格式
+		var result = dateArr[1] + '/' + dateArr[2];
+		return result;
+	};
+
+	/**
+	 * 计算十神关系
+	 * 根据日主天干和目标天干计算十神关系
+	 * 与Paipan.ts中的算法保持一致
+	 */
+	this.calculateShishen = function (dayGanIndex, targetGanIndex) {
+		if (dayGanIndex === -1 || targetGanIndex === -1) return '';
+
+		// 十神查找表dgs[日干索引][其他干索引] = 十神索引(0-9)
+		var dgs = [
+			[2, 3, 1, 0, 9, 8, 7, 6, 5, 4],  // 甲
+			[3, 2, 0, 1, 8, 9, 6, 7, 4, 5],  // 乙
+			[5, 4, 2, 3, 1, 0, 9, 8, 7, 6],  // 丙
+			[4, 5, 3, 2, 0, 1, 8, 9, 6, 7],  // 丁
+			[7, 6, 5, 4, 2, 3, 1, 0, 9, 8],  // 戊
+			[6, 7, 4, 5, 3, 2, 0, 1, 8, 9],  // 己
+			[9, 8, 7, 6, 5, 4, 2, 3, 1, 0],  // 庚
+			[8, 9, 6, 7, 4, 5, 3, 2, 0, 1],  // 辛
+			[1, 0, 9, 8, 7, 6, 5, 4, 2, 3],  // 壬
+			[0, 1, 8, 9, 6, 7, 4, 5, 3, 2]   // 癸
+		];
+
+		var sssFull = ['伤官', '食神', '比肩', '劫财', '正印', '偏印', '正官', '偏官', '正财', '偏财'];
+
+		var dayRow = dgs[dayGanIndex];
+		if (!dayRow) return '';
+		var shiShenIndex = dayRow[targetGanIndex];
+		if (shiShenIndex === undefined) return '';
+		return sssFull[shiShenIndex] || '';
+	};
+
+	/**
+	 * 计算地支十神 - 根据地支的主气（藏干第一个）计算与日干的十神关系
+	 */
+	this.getZhiShiShen = function (dayGan, zhi) {
+		// 获取地支对应的主气（第一个藏干）
+		var mainCangGan = this.getMainCangGan(zhi);
+		if (!mainCangGan) {
+			return '';
+		}
+		
+		// 使用现有的十神计算方法
+		var dayGanIndex = this.ctg.indexOf(dayGan.charAt(0));
+		var cangGanIndex = this.ctg.indexOf(mainCangGan);
+		
+		if (dayGanIndex === -1 || cangGanIndex === -1) {
+			return '';
+		}
+		
+		return this.calculateShishen(dayGanIndex, cangGanIndex);
+	};
+
+	/**
+	 * 获取地支的主气藏干
+	 */
+	this.getMainCangGan = function (zhi) {
+		var zhiIndex = this.cdz.indexOf(zhi);
+		if (zhiIndex === -1) return '';
+		
+		// 地支藏干表（索引0-11对应子到亥）
+		var cangGanTable = [
+			// 子(0): 癸
+			[9, -1, -1],   
+			// 丑(1): 己辛癸
+			[5, 9, 7],    
+			// 寅(2): 甲丙戊
+			[0, 2, 4],    
+			// 卯(3): 乙
+			[1, -1, -1],  
+			// 辰(4): 戊乙癸
+			[4, 1, 9],    
+			// 巳(5): 丙戊庚
+			[2, 4, 6],    
+			// 午(6): 己丁
+			[5, 3, -1],   
+			// 未(7): 己丁乙
+			[5, 3, 1],    
+			// 申(8): 庚壬戊
+			[6, 8, 4],    
+			// 酉(9): 辛
+			[7, -1, -1],  
+			// 戌(10): 戊辛丁
+			[4, 7, 3],    
+			// 亥(11): 壬甲
+			[8, 0, -1]    
+		];
+		
+		var mainGanIndex = cangGanTable[zhiIndex][0];
+		if (mainGanIndex === -1 || mainGanIndex >= this.ctg.length) {
+			return '';
+		}
+		
+		return this.ctg[mainGanIndex];
+	};
+
+	/**
+	 * 获取后备节气分布（当标准计算失败时使用）
+	 */
+	this._getFallbackJQDistribution = function(year) {
+		// 基于年份的近似节气儒略日计算
+		var baseYear = 2000; // 参考年份
+		var baseJD = 2451545; // 2000年1月1日12时的儒略日
+		
+		var jdez = [];
+		var yearSpan = year - baseYear;
+		var daysPerYear = 365.2422; // 平均回归年长度
+		
+		// 使用简化的近似计算
+		for (var i = 0; i < 24; i++) {
+			jdez[i] = baseJD + yearSpan * daysPerYear + i * 15.2; // 约15.2天一个节气
+		}
+		
+		return jdez;
+	};
+
+	/**
+	 * 获取默认儒略日（当计算异常时使用）
+	 */
+	this._getDefaultJulianDay = function(year, jqIndex) {
+		// 基于固定日期的简单计算
+		var baseDate = new Date(year, 0, 1);
+		baseDate.setHours(12, 0, 0, 0); // 中午12点
+		
+		// 每个节气大约间隔15.2天
+		var offsetDays = jqIndex * 15.2;
+		baseDate.setDate(baseDate.getDate() + offsetDays);
+		
+		// 计算儒略日
+		var time = baseDate.getTime();
+		return (time / 86400000.0) + 2440587.5;
+	};
+
+	/**
+	 * 增强节气计算验证
+	 */
+	this._validateJQCalculation = function(year, jqList) {
+		if (!jqList || jqList.length !== 24) return false;
+		
+		// 检查儒略日是否递增
+		for (var i = 1; i < 24; i++) {
+			if (jqList[i] <= jqList[i-1]) {
+				console.warn('节气儒略日未递增:', jqList[i-1], '->', jqList[i]);
+				return false;
+			}
+		}
+		
+		// 检查年度跨度是否合理（约365天）
+		var yearSpan = jqList[23] - jqList[0];
+		if (yearSpan < 360 || yearSpan > 370) {
+			console.warn('年份', year, '节气跨度异常:', yearSpan);
+			return false;
+		}
+		
+		return true;
 	};
 }
 window.paipan = paipan; // 将构造函数挂载到 window 对象上

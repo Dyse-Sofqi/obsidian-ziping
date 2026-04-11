@@ -140,7 +140,7 @@ export class TimeSettingModal extends Modal {
         tagSelect.addClass('margin-left-10', 'margin-right-10', 'ziping-border-1-ccc', 'ziping-boxShadow-none');
 
         // 添加标签选项
-        const tagOptions = ['关注', '亲友', '名人', '古籍', '客户', '其他'];
+        const tagOptions = ['常驻', '亲友', '名人', '古例', '客户', '其他'];
         const defaultOption = tagSelect.createEl('option');
         defaultOption.textContent = '默认';
         defaultOption.value = '';

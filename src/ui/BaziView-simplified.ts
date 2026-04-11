@@ -9,6 +9,7 @@ import { DataService } from '../services/DataService';
 import { TimeSettingModal } from './TimeSettingModal';
 import { BaziTable } from './components/BaziTable';
 import { DayunDisplay } from './components/DayunDisplay';
+import { LiuyueDisplay } from './components/LiuyueDisplay';
 import { ResultDisplay } from './components/ResultDisplay';
 import { CurrentBaziData } from '../models/types';
 import ZipingPlugin from '../main';
@@ -29,7 +30,11 @@ export class BaziView extends ItemView {
     // UI组件实例
     private baziTable: BaziTable;
     private dayunDisplay: DayunDisplay;
+    private liuyueDisplay: LiuyueDisplay;
     private resultDisplay: ResultDisplay;
+    
+    // 防抖控制变量
+    private refreshTimeout: NodeJS.Timeout | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: ZipingPlugin) {
         super(leaf);
@@ -48,6 +53,7 @@ export class BaziView extends ItemView {
         // 初始化UI组件
         this.baziTable = new BaziTable(this.paipan);
         this.dayunDisplay = new DayunDisplay(this.paipan);
+        this.liuyueDisplay = new LiuyueDisplay();
         this.resultDisplay = new ResultDisplay(this.paipan);
     }
 
@@ -94,6 +100,19 @@ export class BaziView extends ItemView {
             },
             () => {
                 this.selectXiaoyun();
+            },
+            (showLiuyue: boolean) => {
+                if (this.currentData) {
+                    this.currentData.showLiuyue = showLiuyue;
+                    this.refreshDisplay();
+                }
+            }
+        );
+
+        // 设置流月显示回调
+        this.liuyueDisplay.setCallbacks(
+            (index: number) => {
+                this.selectLiuyue(index);
             }
         );
     }
@@ -165,7 +184,7 @@ export class BaziView extends ItemView {
         this.loadCurrentTime();
     }
     
-    // 加载当前时间的数据
+        // 加载当前时间的数据
     loadCurrentTime(): void {
         const now = new Date();
         const year = now.getFullYear();
@@ -177,10 +196,10 @@ export class BaziView extends ItemView {
         
         // 回到现在时，重置为默认性别（男性）和默认设置
         const gender = 0; // 默认男性
-        const name = this.currentData?.name ?? '';
+        const name = ''; // 清空姓名
         // 回到现在时，重置校时状态为未勾选
         const timeCorrectionEnabled = false;
-        const tag = this.currentData?.tag ?? '';
+        const tag = ''; // 清空标签
         
         void this.updateBaziDisplay(year, month, day, hour, minute, second, gender, name, timeCorrectionEnabled, tag);
     }
@@ -224,7 +243,9 @@ export class BaziView extends ItemView {
         if (preserveSelection && this.currentData) {
             baziData.selectedDayunIndex = this.currentData.selectedDayunIndex;
             baziData.selectedLiunianIndex = this.currentData.selectedLiunianIndex;
+            baziData.selectedLiuyueIndex = this.currentData.selectedLiuyueIndex;
             baziData.showHourPillar = this.currentData.showHourPillar;
+            baziData.showLiuyue = this.currentData.showLiuyue;
         }
         
         // 更新当前数据
@@ -236,6 +257,11 @@ export class BaziView extends ItemView {
             this.resultDisplay.displayResults(resultContainer, baziData);
             this.baziTable.createBaziTable(resultContainer, baziData);
             this.dayunDisplay.displayDayunInfo(resultContainer, baziData);
+            
+            // 条件显示流月信息
+            if (baziData.showLiuyue) {
+                this.liuyueDisplay.displayLiuyueInfo(resultContainer, baziData);
+            }
         }
     }
     
@@ -289,6 +315,7 @@ export class BaziView extends ItemView {
     
     // 保存当前案例
     async saveCurrentCase(): Promise<void> {
+        if (!this.currentData) return;
         await this.dataService.saveCase(this.currentData);
     }
     
@@ -317,23 +344,40 @@ export class BaziView extends ItemView {
         this.currentData.selectedLiunianIndex = 0;
         this.refreshDisplay();
     }
+
+    // 选择流月
+    selectLiuyue(index: number): void {
+        if (!this.currentData) return;
+        this.currentData.selectedLiuyueIndex = index;
+        this.refreshDisplay();
+    }
     
     // 刷新显示
     refreshDisplay(): void {
         if (!this.currentData) return;
-        void this.updateBaziDisplay(
-            this.currentData.year,
-            this.currentData.month,
-            this.currentData.day,
-            this.currentData.hour,
-            this.currentData.minute,
-            this.currentData.second,
-            this.currentData.gender,
-            this.currentData.name || '',
-            this.currentData.timeCorrectionEnabled || false,
-            this.currentData.tag || '',
-            true // preserveSelection
-        );
+        
+        // 添加防抖机制，避免频繁重绘
+        if (this.refreshTimeout) {
+            clearTimeout(this.refreshTimeout);
+        }
+        
+        this.refreshTimeout = setTimeout(() => {
+            if (this.currentData) {
+                void this.updateBaziDisplay(
+                    this.currentData.year,
+                    this.currentData.month,
+                    this.currentData.day,
+                    this.currentData.hour,
+                    this.currentData.minute,
+                    this.currentData.second,
+                    this.currentData.gender,
+                    this.currentData.name || '',
+                    this.currentData.timeCorrectionEnabled || false,
+                    this.currentData.tag || '',
+                    true // preserveSelection
+                );
+            }
+        }, 16); // 16ms防抖延迟，约等于单帧时间
     }
     
     // 适配器方法，用于TimeSettingModal的回调

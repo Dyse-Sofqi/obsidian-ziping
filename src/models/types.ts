@@ -16,6 +16,8 @@ export interface CurrentBaziData {
     dayun: CurrentDayunData;
     selectedDayunIndex?: number;
     selectedLiunianIndex?: number;
+    selectedLiuyueIndex?: number;
+    liuyue?: LiuyueItem[];
     timeCorrectionEnabled: boolean;
     tag: string;
     province?: string;
@@ -24,6 +26,7 @@ export interface CurrentBaziData {
     longitude?: number;
     latitude?: number;
     showHourPillar?: boolean;
+    showLiuyue?: boolean;
 }
 
 // Paipan.ts 中的类型定义
@@ -67,6 +70,9 @@ export interface CurrentDayunData {
     qyy_desc?: string;
     qyy_desc2?: string;
     renyuanSiling?: string;
+    jiaoyunDateDesc?: string;  // 交运具体日期描述，如"立春后3日5时"
+    jiaoyunDetailDesc?: string; // 原交运描述作为备用
+    dayun?: DayunItem[]; // 兼容新老版本
 }
 
 // 地理位置相关类型
@@ -90,6 +96,18 @@ export interface FilterResult {
     month: number;
     day: number;
     hour: number;
+}
+
+// 流月相关类型
+export interface LiuyueItem {
+    name: string;     // "立春"、"雨水"等节气名称
+    date: string;     // "2/4" 格式日期
+    gan: string;      // 天干
+    zhi: string;      // 地支
+    gz: string;       // 完整干支
+    ganShishen?: string;  // 天干十神
+    zhiShishen?: string;  // 地支十神
+    shishen: string;  // 十神（保持向后兼容性）- 默认为天干十神
 }
 
 // 排盘码识别结果

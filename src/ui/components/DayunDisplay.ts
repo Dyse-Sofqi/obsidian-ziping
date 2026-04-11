@@ -8,6 +8,7 @@ export class DayunDisplay {
     private onDayunSelect?: (index: number) => void;
     private onLiunianSelect?: (dayunIndex: number, liunianIndex: number) => void;
     private onXiaoyunSelect?: () => void;
+    private onLiuyueCheckboxChange?: (showLiuyue: boolean) => void;
 
     constructor(paipan: Paipan) {
         this.paipan = paipan;
@@ -17,11 +18,13 @@ export class DayunDisplay {
     setCallbacks(
         onDayunSelect?: (index: number) => void,
         onLiunianSelect?: (dayunIndex: number, liunianIndex: number) => void,
-        onXiaoyunSelect?: () => void
+        onXiaoyunSelect?: () => void,
+        onLiuyueCheckboxChange?: (showLiuyue: boolean) => void
     ) {
         this.onDayunSelect = onDayunSelect;
         this.onLiunianSelect = onLiunianSelect;
         this.onXiaoyunSelect = onXiaoyunSelect;
+        this.onLiuyueCheckboxChange = onLiuyueCheckboxChange;
     }
 
     // 显示大运信息
@@ -66,7 +69,40 @@ export class DayunDisplay {
             const wuxing = this.paipan.getGanWuXing(data.dayun.renyuanSiling);
             renyuanSpan.addClass('c-' + wuxing);
         }
-        dayunDiv.createEl('p', { text: `交运：${data.dayun.startAge}岁，${data.dayun.qyy_desc2 ? data.dayun.qyy_desc2 : ''}`});
+        // 交运信息与流月checkbox在同一行显示
+        const jiaoyunContainer = dayunDiv.createEl('div');
+        jiaoyunContainer.addClass('ziping-flex-gap-0-mb-6-0-6-0');
+        
+        // 交运文本 - 使用新的"${上一节令}后几天几时"格式，原描述作为备用
+        let jiaoyunText = `交运：${data.dayun.startAge}岁`;
+        
+        if (data.dayun.jiaoyunDateDesc) {
+            // 优先使用新的具体日期描述
+            jiaoyunText += `，${data.dayun.jiaoyunDateDesc}交运`;
+        } else if (data.dayun.qyy_desc2) {
+            // 如果没有新的描述，使用原描述
+            jiaoyunText += `，${data.dayun.qyy_desc2}交运`;
+        }
+        
+        jiaoyunContainer.createEl('span', { text: jiaoyunText });
+        
+        // 流月checkbox显示在靠右侧
+        const liuyueCheckboxContainer = jiaoyunContainer.createEl('div', { cls: 'ziping-flex-gap-0' });
+        liuyueCheckboxContainer.addClass('ziping-margin-left-auto','ziping-flex-gap-0-justify-end');
+        const liuyueCheckbox = liuyueCheckboxContainer.createEl('input', { type: 'checkbox' });
+        liuyueCheckbox.addClass('ziping-switch-checkbox');
+        liuyueCheckbox.checked = data.showLiuyue === true; // showLiuyue为true时才勾选，默认关闭
+        const liuyueLabel = liuyueCheckboxContainer.createEl('span', { text: '流月' });
+        liuyueLabel.addClass('ziping-flex-nowrap');
+        
+        // 监听checkbox状态变化
+        liuyueCheckbox.addEventListener('change', () => {
+            data.showLiuyue = liuyueCheckbox.checked;
+            // 触发重新渲染
+            if (this.onLiuyueCheckboxChange) {
+                this.onLiuyueCheckboxChange(data.showLiuyue);
+            }
+        });
         dayunDiv.createEl('p', { text: displayText });
 
         // 大运列表

@@ -112,7 +112,7 @@ export class ResultDisplay {
         const solarTermsRow = timeDiv.createEl('div');
         solarTermsRow.addClass('solar-terms-row', 'ziping-flex-gap-0-mb-6-0-6-0');
 
-        // 节气信息在前
+        // 干支月节令信息在前
         if (data.solarTerms.previous && data.solarTerms.next) {
             const formatDateTime = (date: Date) => {
                 const hours = date.getHours().toString().padStart(2, '0');
@@ -120,7 +120,7 @@ export class ResultDisplay {
                 return `${date.getMonth() + 1}/${date.getDate()} ${hours}:${minutes}`;
             };
             solarTermsRow.createEl('span', {
-                text: `节气：${data.solarTerms.previous.name}${formatDateTime(data.solarTerms.previous.date)}-${data.solarTerms.next.name}${formatDateTime(data.solarTerms.next.date)}`
+                text: `月节令：${data.solarTerms.previous.name}${formatDateTime(data.solarTerms.previous.date)}-${data.solarTerms.next.name}${formatDateTime(data.solarTerms.next.date)}`
             });
         }
 
@@ -135,7 +135,6 @@ export class ResultDisplay {
 
         // 简单的事件处理
         const handleToggle = (isChecked: boolean) => {
-            // console.log('时柱checkbox状态变化:', isChecked);
             data.showHourPillar = isChecked;
             if (this.onHourPillarToggle) {
                 this.onHourPillarToggle(isChecked);

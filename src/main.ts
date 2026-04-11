@@ -193,7 +193,7 @@ export default class ZipingPlugin extends Plugin {
 		lines.push('');
 		// 9. 生成大运列表，每行展示一个大运的起始年份和干支和岁数
 		for (const dayun of dayunItems) {
-			lines.push(`- ${dayun.startYear}年${dayun.gan}${dayun.zhi}-${dayun.age}岁`);
+			lines.push(`- ${dayun.startYear}${dayun.gan}${dayun.zhi}年${dayun.age}岁`);
 		}
 		lines.push('');
 

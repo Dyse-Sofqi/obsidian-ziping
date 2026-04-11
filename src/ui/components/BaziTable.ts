@@ -53,6 +53,18 @@ export class BaziTable {
         const liuNianGan = liuNianGanZhi.gan;
         const liuNianZhi = liuNianGanZhi.zhi;
 
+        // 获取选中流月的干支（如果有流月数据）
+        let liuyueGan = '';
+        let liuyueZhi = '';
+        if (data.liuyue && data.liuyue.length > 0) {
+            const selectedLiuyueIndex = data.selectedLiuyueIndex ?? 0;
+            const liuyueItem = data.liuyue[selectedLiuyueIndex];
+            if (liuyueItem) {
+                liuyueGan = liuyueItem.gan;
+                liuyueZhi = liuyueItem.zhi;
+            }
+        }
+
         // 四柱干支
         const pillars: Array<{ name: string, gan: string, zhi: string }> = [
             { name: '年柱', gan: data.bazi.gztg[0] || '', zhi: data.bazi.dz[0] || '' },
@@ -74,7 +86,14 @@ export class BaziTable {
             headers.push('时柱');
         }
         
+        
+        
         headers.push(dayunHeaderTitle, '流年');
+        
+        // 如果显示流月，则添加流月列（放在流年右侧，即最后一列）
+        if (data.showLiuyue) {
+            headers.push('流月');
+        }
         
         headers.forEach(title => {
             const th = headerRow.createEl('th');
@@ -94,8 +113,14 @@ export class BaziTable {
             columns.push({ gan: pillars[3]!.gan, zhi: pillars[3]!.zhi, gz: pillars[3]!.gan + pillars[3]!.zhi });
         }
         
+        
         columns.push({ gan: dayunGan, zhi: dayunZhi, gz: dayunGan + dayunZhi });
         columns.push({ gan: liuNianGan, zhi: liuNianZhi, gz: liuNianGan + liuNianZhi });
+        
+        // 如果显示流月，则添加流月列（放在流年右侧，即最后一列）
+        if (data.showLiuyue && liuyueGan && liuyueZhi) {
+            columns.push({ gan: liuyueGan, zhi: liuyueZhi, gz: liuyueGan + liuyueZhi });
+        }
 
         const genderText = data.gender === 0 ? '元男' : '元女';
         const shishenRow = table.createEl('tr');
@@ -113,17 +138,22 @@ export class BaziTable {
             shishenValues.push(this.paipan.getShiShenFull(riZhuGan, pillars[3]!.gan));
         }
         
-        // 大运和流年的十神（它们总是在最后两列）
         shishenValues.push(
             this.paipan.getShiShenFull(riZhuGan, dayunGan),
             this.paipan.getShiShenFull(riZhuGan, liuNianGan)
         );
+        
+        // 流月的十神（放在流年右侧，即最后一列）
+        if (data.showLiuyue) {
+            shishenValues.push(this.paipan.getShiShenFull(riZhuGan, liuyueGan));
+        }
         shishenValues.forEach((text, index) => {
             const td = shishenRow.createEl('td');
             td.setText(text);
             td.addClass('ziping-table-cell');
-            // 为大运列添加左边框样式（大运总是在倒数第二列）
-            if (index === shishenValues.length - 2) {
+            // 为大运列添加左边框样式（大运总是在倒数第二列，流年总是在倒数第一列）
+            const dayunColumnIndex = data.showLiuyue ? shishenValues.length - 3 : shishenValues.length - 2;
+            if (index === dayunColumnIndex) {
                 td.addClass('ziping-border-left');
             }
         });
@@ -164,8 +194,9 @@ export class BaziTable {
                 const td = row.createEl('td');
                 td.addClass('ziping-table-cell');
                 
-                // 为大运列添加左边框样式（大运总是在倒数第二列）
-                if (idx === rowData.values.length - 2) {
+                // 为大运列添加左边框样式（大运总是在倒数第二列，流年总是在倒数第一列，流月在流年右侧）
+                const dayunColumnIndex = data.showLiuyue ? rowData.values.length - 3 : rowData.values.length - 2;
+                if (idx === dayunColumnIndex) {
                     td.addClass('ziping-border-left');
                 }
 

@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { BaziResult } from './models/types';
+import { BaziResult, LiuyueItem } from './models/types';
 
 // 类型定义
 declare global {
@@ -27,6 +27,7 @@ interface PaipanEngine {
     calculateQiyunSimplified?: (birthTimestamp: number, solarTermTimestamp: number, xb: number, yearGan: string) => { years: number; months: number; days: number; description: string };
     calculateRenyuanSiling?: (birthTimestamp: number, solarTermTimestamp: number, ord: number) => string;
     dateTimeToTimestamp?: (year: number, month: number, day: number, hour: number, minute: number, second: number) => number;
+    calculateLiuyue?: (baziResult: any, liunianYear: number) => LiuyueItem[];
 
 }
 
@@ -136,7 +137,7 @@ export class Paipan {
         const finalJingdu = jingdu !== undefined ? jingdu : (this.timeCorrectionEnabled ? this.J : undefined);
         const finalWeidu = weidu !== undefined ? weidu : (this.timeCorrectionEnabled ? this.W : undefined);
         const useTimeCorrection = finalJingdu !== undefined && finalWeidu !== undefined;
-        
+
         // 调用底层引擎，传入经纬度参数
         const result = this.engine.fatemaps(xb, yy, mm, dd, hh, mt, ss, finalJingdu, finalWeidu);
         if (!result || !result.ctg || !result.cdz) {
@@ -179,22 +180,22 @@ export class Paipan {
         if (!Array.isArray(jq) || jq.length < 24) {
             return [];
         }
-        
+
         const solarTerms: SolarTerm[] = [];
         for (let i = 0; i < 24; i++) {
             const jd = jq[i];
             if (typeof jd !== 'number' || isNaN(jd)) {
                 continue;
             }
-            
+
             const termDate = this.jdToDate(jd);
             // 获取完整的JD时间数组 [年, 月, 日, 时, 分, 秒]
             const jr = this.engine.Jtime ? this.engine.Jtime(jd) : [];
-            
-            const jqName = (this.engine.jq && Array.isArray(this.engine.jq) && i < this.engine.jq.length 
-                ? this.engine.jq[i] 
-                : `节气${i+1}`) || `节气${i+1}`;
-            
+
+            const jqName = (this.engine.jq && Array.isArray(this.engine.jq) && i < this.engine.jq.length
+                ? this.engine.jq[i]
+                : `节气${i + 1}`) || `节气${i + 1}`;
+
             solarTerms.push({
                 name: jqName,
                 date: termDate,
@@ -203,27 +204,35 @@ export class Paipan {
                 value: jd
             });
         }
-        
-        return solarTerms;
+
+        // 确保节气按时间顺序排序
+        return solarTerms.sort((a, b) => a.date.getTime() - b.date.getTime());
     }
 
     getNearbySolarTerms(yy: number, mm: number, dd: number): NearbySolarTerms {
-        const terms = this.getSolarTerms(yy);
+        // 改进的节气查找方法：需要获取多年份的节气数据来确保正确性
         const currentDate = new Date(yy, mm - 1, dd);
+        
+        // 获取多年份的节气数据：当前年、前一年、后一年
+        const terms: SolarTerm[] = [];
+        for (let y = yy - 1; y <= yy + 1; y++) {
+            const yearTerms = this.getSolarTerms(y);
+            terms.push(...yearTerms);
+        }
+        
+        // 按时间顺序排序所有节气
+        const sortedTerms = terms.sort((a, b) => a.date.getTime() - b.date.getTime());
+        
         let previous: SolarTerm | null = null;
         let next: SolarTerm | null = null;
 
-        for (const term of terms) {
+        for (const term of sortedTerms) {
             if (term.date.getTime() <= currentDate.getTime()) {
                 previous = term;
             } else {
                 next = term;
                 break;
             }
-        }
-
-        if (!previous && terms.length > 0) {
-            previous = terms[terms.length - 1] || null;
         }
 
         return {
@@ -238,7 +247,7 @@ export class Paipan {
         const hour = birthHour !== undefined && birthHour >= 0 && birthHour <= 23 ? birthHour : 12;
         const minute = birthMinute !== undefined && birthMinute >= 0 && birthMinute <= 59 ? birthMinute : 30;
         const second = birthSecond !== undefined && birthSecond >= 0 && birthSecond <= 59 ? birthSecond : 0;
-        
+
         // 如果已有计算结果，则直接使用，避免重复计算
         const rt = existingResult || this.engine.fatemaps(gender, birthYear, birthMonth, birthDay, hour, minute, second, this.J, this.W);
         if (!rt || !rt.dy) {
@@ -277,15 +286,15 @@ export class Paipan {
             throw new Error('无法计算当前大运');
         }
 
-		return {
-				startAge: allDayun[0]?.age ?? 0 ,  // 虚岁: 出生第一年即1岁
-				currentDayun,
-				liunian: now.getFullYear(),
-				allDayun,
-				qyy_desc: rt.qyy_desc,
-				qyy_desc2: rt.qyy_desc2,
-				renyuanSiling: rt.renyuanSiling
-		};
+        return {
+            startAge: allDayun[0]?.age ?? 0,  // 虚岁: 出生第一年即1岁
+            currentDayun,
+            liunian: now.getFullYear(),
+            allDayun,
+            qyy_desc: rt.qyy_desc,
+            qyy_desc2: rt.qyy_desc2,
+            renyuanSiling: rt.renyuanSiling
+        };
     }
 
     getLunarDate(yy: number, mm: number, dd: number): { year: number; month: number; day: number; isLeap: boolean; monthName: string; yearGanZhi: string } | null {
@@ -403,41 +412,41 @@ export class Paipan {
     getXiaoYun(hourGan: string, hourZhi: string, birthYear: number, gender: number, age: number): { gan: string; zhi: string } {
         // 获取出生年的年干
         const birthYearGan = this.getYearGanZhi(birthYear).gan;
-        
+
         // 判断出生年的阴阳属性
         const isYangYear = this.isYangGan(birthYearGan);
-        
+
         // 确定排列方向
         const isMale = gender === 0; // 0=男，1=女
         const isForward = (isYangYear && isMale) || (!isYangYear && !isMale);
-        
+
         // 获取时柱干支在干支表中的索引
         const ganIndex = this.engine.ctg.indexOf(hourGan);
         const zhiIndex = this.engine.cdz.indexOf(hourZhi);
-        
+
         if (ganIndex === -1 || zhiIndex === -1) {
             return { gan: '', zhi: '' };
         }
-        
+
         // 计算步数（1岁小运是时柱后推1位，与时柱相邻）
         const step = age;
-        
+
         // 计算新索引（60年一个完整周期）
-        const newGanIndex = isForward 
+        const newGanIndex = isForward
             ? (ganIndex + step) % 10
             : (ganIndex - step + 1000) % 10; // +1000确保足够大的正数
-        
+
         const newZhiIndex = isForward
             ? (zhiIndex + step) % 12
             : (zhiIndex - step + 1200) % 12; // +1200确保足够大的正数
-        
+
         // 返回小运干支
         return {
             gan: this.engine.ctg[newGanIndex] ?? '',
             zhi: this.engine.cdz[newZhiIndex] ?? ''
         };
     }
-    
+
     /**
      * 计算大运期间所有年份对应的小运
      * @param hourGan 时柱天干
@@ -449,20 +458,20 @@ export class Paipan {
      * @returns 返回年份到小运的映射
      */
     getXiaoYunForDayun(
-        hourGan: string, 
-        hourZhi: string, 
-        birthYear: number, 
-        gender: number, 
-        startAge: number, 
+        hourGan: string,
+        hourZhi: string,
+        birthYear: number,
+        gender: number,
+        startAge: number,
         endAge: number
     ): Record<number, { gan: string; zhi: string }> {
         const result: Record<number, { gan: string; zhi: string }> = {};
-        
+
         for (let age = startAge; age <= endAge; age++) {
             const year = birthYear + age;
             result[year] = this.getXiaoYun(hourGan, hourZhi, birthYear, gender, age);
         }
-        
+
         return result;
     }
 
@@ -476,9 +485,9 @@ export class Paipan {
      * @returns 起运描述信息
      */
     calculateQiyunSimplified(
-        birthTimestamp: number, 
-        solarTermTimestamp: number, 
-        xb: number, 
+        birthTimestamp: number,
+        solarTermTimestamp: number,
+        xb: number,
         yearGan: string
     ): { years: number; months: number; days: number; description: string } {
         // 调用paipan.js引擎的起运计算函数
@@ -568,16 +577,16 @@ export class Paipan {
         second?: number,
         xb?: number,
         yearGan?: string
-    ): { 
-        previousSolarTerm: SolarTerm | null; 
+    ): {
+        previousSolarTerm: SolarTerm | null;
         nextSolarTerm: SolarTerm | null;
         qiyunInfo: { years: number; months: number; days: number; description: string } | null;
     } {
         const birthDate = new Date(birthYear, birthMonth - 1, birthDay, hour || 12, minute || 30, second || 0);
-        
+
         // 获取相关节气信息
         const nearby = this.getNearbySolarTerms(birthYear, birthMonth, birthDay);
-        
+
         // 如果没有找到相关的节气，返回空值
         if (!nearby.previous && !nearby.next) {
             return {
@@ -586,25 +595,25 @@ export class Paipan {
                 qiyunInfo: null
             };
         }
-        
+
         let qiyunInfo = null;
-        
+
         // 如果有年干和性别信息，进行完整的起运计算
         if (yearGan && xb !== undefined && nearby.previous && nearby.next) {
             const birthTimestamp = birthDate.getTime();
-            
+
             // 判断大运顺排还是逆排
             const yangGan = ['甲', '丙', '戊', '庚', '壬'];
             const isYangGan = yangGan.includes(yearGan);
             const isMale = xb === 0;
-            
+
             // 阳年男或阴年女 → 顺排；阴年男或阳年女 → 逆排
             const isForward = (isYangGan && isMale) || (!isYangGan && !isMale);
-            
+
             // 根据顺逆排决定使用哪个节气作为计算基准
             const solarTerm = isForward ? nearby.next : nearby.previous;
             const solarTermTimestamp = solarTerm.date.getTime();
-            
+
             try {
                 qiyunInfo = this.calculateQiyunSimplified(
                     birthTimestamp,
@@ -616,7 +625,7 @@ export class Paipan {
                 console.warn('起运计算失败:', error);
             }
         }
-        
+
         return {
             previousSolarTerm: nearby.previous,
             nextSolarTerm: nearby.next,
@@ -675,7 +684,7 @@ export class Paipan {
             [0, 1, 8, 9, 6, 7, 4, 5, 3, 2]   // 癸
         ];
 
-        const sss = ['伤', '食', '比', '劫','印', '枭', '官', '杀','财', '才' ];
+        const sss = ['伤', '食', '比', '劫', '印', '枭', '官', '杀', '财', '才'];
 
         const dayRow = dgs[dayIndex];
         if (!dayRow) return '';
@@ -930,12 +939,12 @@ export class Paipan {
     // 根据日柱干支筛选年份中的日期
     filterDatesByDayGanZhi(years: number[], dayGan: string, dayZhi: string): { year: number; month: number; day: number }[] {
         const result: { year: number; month: number; day: number }[] = [];
-        
+
         for (const year of years) {
             // 遍历该年的每一天
             const startDate = new Date(year, 0, 1);
             const endDate = new Date(year, 11, 31);
-            
+
             for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
                 const bazi = this.fatemaps(0, year, date.getMonth() + 1, date.getDate(), 12, 0, 0);
                 if (bazi.gztg[2] === dayGan && bazi.dz[2] === dayZhi) {
@@ -955,16 +964,16 @@ export class Paipan {
         // 地支顺序：子丑寅卯辰巳午未申酉戌亥
         const zhiOrder = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
         const zhiIndex = zhiOrder.indexOf(hourZhi);
-        
+
         if (zhiIndex === -1) return 0;
-        
+
         // 晚子时（23:00-24:00）返回23
         if (hourZhi === '子' && isLateZi) return 23;
-        
+
         // 正常情况下，子时从23:00开始，但早子时从0:00开始
         // 这里我们默认返回早子时（0:00）
         if (hourZhi === '子') return 0;
-        
+
         // 其他时辰：丑时1:00，寅时3:00，...
         return zhiIndex * 2;
     }
@@ -979,20 +988,20 @@ export class Paipan {
     ): { year: number; month: number; day: number; hour: number }[] {
         // 第一步：根据年柱干支筛选年份
         const matchingYears = this.filterYearsByGanZhi(yearGan, yearZhi, monthZhi, dayGan, dayZhi);
-        
+
         // 第二步：根据日柱干支筛选日期
         const matchingDates = this.filterDatesByDayGanZhi(matchingYears, dayGan, dayZhi);
-        
+
         // 第三步：根据时柱地支和月柱干支筛选时间
         const result: { year: number; month: number; day: number; hour: number }[] = [];
-        
+
         for (const date of matchingDates) {
             // 获取时辰开始时间
             const hourStart = this.getHourStartByZhi(hourZhi, isLateZi);
-            
+
             // 计算该日的四柱干支
             const bazi = this.fatemaps(0, date.year, date.month, date.day, hourStart, 0, 0);
-            
+
             // 检查月柱干支是否匹配
             if (bazi.gztg[1] === monthGan && bazi.dz[1] === monthZhi) {
                 // 检查时柱干支是否匹配
@@ -1006,7 +1015,248 @@ export class Paipan {
                 }
             }
         }
-        
+
         return result;
+    }
+
+    // 计算流月
+    calculateLiuyue(baziResult: any, liunianYear: number): LiuyueItem[] {
+        return this.engine.calculateLiuyue?.(baziResult, liunianYear) || [];
+    }
+
+    // 12干支月开始节气（节令）定义
+    private readonly GANZHI_MONTH_SOLAR_TERMS = [
+        '立春', '惊蛰', '清明', '立夏', '芒种', '小暑',
+        '立秋', '白露', '寒露', '立冬', '大雪', '小寒'
+    ];
+
+    /**
+     * 获取干支月开始节气（12节令）
+     * @param year 年份
+     * @returns 12个干支月开始节气的数组
+     */
+    getGanzhiMonthSolarTerms(year: number): SolarTerm[] {
+        // 使用paipan.js的正确节气算法：可能需要前后两年才能得到全年12个节令
+        const jqCurrentYear = this.engine.GetAdjustedJQ(year, false);
+        const jqPrevYear = this.engine.GetAdjustedJQ(year - 1, false);
+        
+        if (!Array.isArray(jqCurrentYear) || jqCurrentYear.length < 24 || !Array.isArray(jqPrevYear) || jqPrevYear.length < 24) {
+            return [];
+        }
+
+
+
+        const ganzhiTerms: SolarTerm[] = [];
+        
+        // 遍历所有节气（两个年份），找到属于当前年的干支月节气
+        // jq数组索引: 0-23对应节气名称数组索引
+        for (let i = 0; i < 48; i++) { // 检查两年的节气
+            const yearIndex = Math.floor(i / 24);
+            const jqIndex = i % 24;
+            const jq = yearIndex === 0 ? jqPrevYear : jqCurrentYear; // 0: 上一年, 1: 当前年
+            
+            const jd = jq[jqIndex];
+            if (typeof jd !== 'number' || isNaN(jd)) {
+                continue;
+            }
+
+            const termDate = this.jdToDate(jd);
+            const actualYear = termDate.getFullYear();
+            
+            // 只取当前年份的节气
+            if (actualYear !== year) {
+                continue;
+            }
+
+            const jr = this.engine.Jtime ? this.engine.Jtime(jd) : [];
+            const actualName = (this.engine.jq && Array.isArray(this.engine.jq) && jqIndex < this.engine.jq.length)
+                ? (this.engine.jq[jqIndex] || `节气${jqIndex + 1}`)
+                : `节气${jqIndex + 1}`;
+
+            // 调试信息已移除
+
+            // 如果是干支月节气，则加入
+            if (this.GANZHI_MONTH_SOLAR_TERMS.includes(actualName)) {
+                ganzhiTerms.push({
+                    name: actualName,
+                    date: termDate,
+                    jr: Array.isArray(jr) && jr.length === 6 ? jr : this.dateToJRArray(termDate),
+                    jd: jd,
+                    value: jd
+                });
+            }
+        }
+
+        // 按时间排序
+        const sortedTerms = ganzhiTerms.sort((a, b) => a.date.getTime() - b.date.getTime());
+        return sortedTerms;
+    }
+
+    /**
+     * 获取当前时间对应的干支月节令
+     * @param year 年份
+     * @param month 月份 (1-12)
+     * @param day 日期
+     * @returns 上一个和下一个干支月节令及间隔天数
+     */
+    getGanzhiMonthNearbySolarTerms(yy: number, mm: number, dd: number): NearbySolarTerms {
+        const ganzhiTerms = this.getGanzhiMonthSolarTerms(yy);
+        const currentDate = new Date(yy, mm - 1, dd);
+        let previous: SolarTerm | null = null;
+        let next: SolarTerm | null = null;
+        
+        // 查找当前日期前后最近的干支月节令
+        // 添加时间边界的精确处理，避免立春/惊蛰映射错误
+        for (const term of ganzhiTerms) {
+            // 精确比较，使用严格的时间戳判断
+            if (term.date.getTime() < currentDate.getTime()) {
+                previous = term;
+            } else {
+                next = term;
+                break;
+            }
+        }
+        
+        // 如果当前时间正好在某个节气时刻，需要特殊处理
+        if (previous && Math.abs(currentDate.getTime() - previous.date.getTime()) < 1000 * 60 * 60) {
+            // 当前时间在一个节气附近的小时范围内，认为该节气是前一个
+            next = previous;
+            const prevYearTerms = this.getGanzhiMonthSolarTerms(yy - 1);
+            previous = prevYearTerms.length > 0 ? prevYearTerms[prevYearTerms.length - 1] || null : null;
+        }
+
+        // 如果没有找到前一个节令，检查上一个年份
+        if (!previous && ganzhiTerms.length > 0) {
+            const prevYearTerms = this.getGanzhiMonthSolarTerms(yy - 1);
+            if (prevYearTerms.length > 0) {
+                previous = prevYearTerms[prevYearTerms.length - 1] || null;
+            } else {
+                console.log('上一年节气数组为空');
+            }
+        }
+
+        // 如果没有找到后一个节令，检查下一个年份
+        if (!next && ganzhiTerms.length > 0) {
+            const nextYearTerms = this.getGanzhiMonthSolarTerms(yy + 1);
+            if (nextYearTerms.length > 0) {
+                next = nextYearTerms[0] || null;
+            }
+        }
+
+        return {
+            previous,
+            next,
+            interval: previous && next ? Math.floor((next.date.getTime() - previous.date.getTime()) / (1000 * 60 * 60 * 24)) : null
+        };
+    }
+
+    /**
+     * 计算交运具体日期描述
+     * @param birthYear 出生年份
+     * @param birthMonth 出生月份
+     * @param birthDay 出生日期
+     * @param qyyDesc2 原交运描述
+     * @returns 交运具体日期描述
+     */
+    calculateJiaoyunDateDesc(birthYear: number, birthMonth: number, birthDay: number, qyyDesc2?: string): { jiaoyunDateDesc: string; jiaoyunDetailDesc: string } {
+        if (!qyyDesc2) {
+            return {
+                jiaoyunDateDesc: '',
+                jiaoyunDetailDesc: ''
+            };
+        }
+
+        // 解析qyy_desc2格式："逢甲、己年2月4日12时交脱大运"
+        // 提取天干地支年和具体的月日时信息
+        const regex = /^逢([^年]+)年(\d{1,2})月(\d{1,2})日(\d{1,2})时交脱大运$/;
+        const match = qyyDesc2.match(regex);
+
+        if (!match) {
+            return {
+                jiaoyunDateDesc: '',
+                jiaoyunDetailDesc: qyyDesc2 || ''
+            };
+        }
+
+        const ganZhiYear = match[1]; // 天干地支年份，如"甲、己"
+        const jiaoyunMonth = parseInt(match[2] || '1');
+        const jiaoyunDay = parseInt(match[3] || '1');
+        const jiaoyunHour = parseInt(match[4] || '0');
+
+        // 根据paipan.js中的逻辑，起运年龄近似计算为：qage = jqyy - ty (出生年份)
+        // 这里采用简化算法估算起运年份
+        let estimatedStartAge = 0;
+
+        // 如果交运月份在出生月份之后或相近，可能在出生后1-2年
+        if (jiaoyunMonth > birthMonth || (jiaoyunMonth === birthMonth && jiaoyunDay >= birthDay)) {
+            estimatedStartAge = 1;
+        } else {
+            estimatedStartAge = 2; // 如果在出生月份之前，可能是下一年
+        }
+
+        const jiaoyunYear = birthYear + estimatedStartAge;
+
+        // 使用getGanzhiMonthNearbySolarTerms获取交运时间相邻的节令
+        // 注意：这里传入的交运时间而不是生日时间
+        const solarTerms = this.getGanzhiMonthNearbySolarTerms(
+            jiaoyunYear,
+            jiaoyunMonth,
+            jiaoyunDay
+        );
+
+        if (!solarTerms) {
+            return {
+                jiaoyunDateDesc: '',
+                jiaoyunDetailDesc: qyyDesc2 || ''
+            };
+        }
+
+        // 找到上一个节令
+        const prevSolarTerm = solarTerms.previous;
+
+        if (!prevSolarTerm) {
+            return {
+                jiaoyunDateDesc: '',
+                jiaoyunDetailDesc: qyyDesc2
+            };
+        }
+
+        // 计算交运时间与前一节令的时间间隔
+        try {
+            const jiaoyunDateTime = new Date(jiaoyunYear, jiaoyunMonth - 1, jiaoyunDay, jiaoyunHour);
+            const prevTermDateTime = new Date(prevSolarTerm.date);
+
+            const timeDiffMs = jiaoyunDateTime.getTime() - prevTermDateTime.getTime();
+            const daysDiff = Math.floor(timeDiffMs / (1000 * 60 * 60 * 24));
+            const hoursDiff = Math.floor((timeDiffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+            // 格式化描述："逢${天干}年${上一节令}后几天几时交运"
+            let dateDesc = `逢${ganZhiYear}年`;
+
+            // 添加节令后时间间隔
+            dateDesc += `${prevSolarTerm.name}后`;
+
+            if (daysDiff > 0) {
+                dateDesc += `${daysDiff}日`;
+                if (hoursDiff > 0) {
+                    dateDesc += `${hoursDiff}时`;
+                }
+            } else if (hoursDiff > 0) {
+                dateDesc += `${hoursDiff}时`;
+            } else {
+                dateDesc += '即时';
+            }
+
+            return {
+                jiaoyunDateDesc: dateDesc,
+                jiaoyunDetailDesc: qyyDesc2
+            };
+        } catch (error) {
+            console.warn('计算交运日期描述时出错:', error);
+            return {
+                jiaoyunDateDesc: '',
+                jiaoyunDetailDesc: qyyDesc2
+            };
+        }
     }
 }
