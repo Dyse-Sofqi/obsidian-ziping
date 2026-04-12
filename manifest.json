@@ -1,11 +1,11 @@
 {
 	"id": "obsidian-Ziping",
 	"name": "子平排盘",
-  "version": "1.0.5",
+	"version": "1.0.5",
 	"minAppVersion": "0.15.0",
 	"description": "子平八字排盘插件",
-	"author": "hkargc",
-	"authorUrl": "https://github.com/hkargc/paipan",
+	"author": "Sofqi",
+	"authorUrl": "https://github.com/Dyse-Sofqi/obsidian-ziping",
 	"fundingUrl": "https://obsidian.md/pricing",
 	"isDesktopOnly": false,
 	"views": {
